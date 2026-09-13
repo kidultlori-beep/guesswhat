@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-13 — GitHub synchronization restored
+
+- Uploaded gameplay commit `19304da` and X-sharing commit `6145896` to `main`. Git required the existing Windows system proxy; the proxy override was applied only to the upload command, with no permanent Git or system configuration changes.
+- The pending-upload notes below describe the earlier failed attempts and are now resolved. Source, tests and development logs are available for coworker handoff; no runtime player database or credentials were uploaded.
+- Deployment remains separate. Follow README.md and docs/implementation-v1.md for Node setup, persistent SQLite storage, public-origin configuration and outstanding browser QA.
+
 ## 2026-09-13 — X sharing and spoiler-free social cards
 
 - Added a dedicated **Share on X** action using X's user-confirmed Web Intent. The selected floor URL and English invitation are prefilled; DrawStacks never posts on a player's behalf or needs X credentials for this flow.
