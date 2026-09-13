@@ -1,6 +1,6 @@
 # DrawStacks — First-version design
 
-Design revision: 2026-09-13. Status: design handoff; no application code implemented.
+Design revision: 2026-09-13. Status: first local/LAN implementation added. See [implementation notes](implementation-v1.md) and [QA status](../design-qa.md) for actual verification and remaining limitations.
 
 ## Product direction
 
@@ -155,4 +155,6 @@ Persist published drawings on the server and drafts on the local device separate
 
 ## Delivery status
 
-Delivered: this behavior specification, four visual mockups, generation brief, and changelog. Not implemented or tested: application runtime, database, editor, multiplayer behavior or rankings. Git access has been authenticated through Git Credential Manager and this design handoff is prepared as the repository's initial commit. Consult Git history for synchronization status.
+Delivered: this behavior specification, four visual mockups, generation brief, and a working Next.js / React / SQLite implementation of the core game, editor, social actions and rankings. Server rules, persistence, HTTP integration and production compilation are tested; browser/visual acceptance is tracked separately in the root QA report. Public hosting and real multi-device LAN playtests are not complete. Consult Git history for synchronization status.
+
+Implementation clarifications: pencil defaults to the mockup's 8 px; marker has independent 16 px / 45% defaults. Opacity spans 5–100%. Smaller screens put settings below the canvas in a responsive panel, rather than a modal bottom sheet. Floor navigation is a scrollable list (horizontal on phones); no separate overview dialog. Completed stack visitors may still guess. Empty/loading copy is adapted to genuine empty-server state. Nickname sessions last 30 days with no account recovery. Comments show an absolute local timestamp. Undo history is not persisted with the draft. These are documented first-release decisions, not unimplemented controls disguised as working UI.

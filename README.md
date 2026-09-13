@@ -4,7 +4,77 @@ An English-language drawing, guessing, and relay game: **Draw. Guess. Build toge
 
 ## Current status
 
-The first-version design is ready for implementation. This repository contains product specifications and visual mockups; it does not yet contain a playable application.
+The first playable local/LAN version is implemented: create stacks, draw, guess, relay, comment, like, share and explore three leaderboards. The initial database is genuinely empty; there are no invented players or scores.
+
+Server rules, HTTP integration, persistence and the production build are verified. Browser interaction and visual acceptance status is recorded separately in [design-qa.md](design-qa.md); do not equate a successful build with a completed browser playtest.
+
+## Run locally
+
+Install **Node.js 24 LTS** (minimum 22.13). SQLite uses Node's built-in `node:sqlite`, so Python, a C++ compiler and a separate database service are not required. Older supported Node releases may print an experimental SQLite warning.
+
+```sh
+npm ci
+npm run build
+npm start
+```
+
+Open [http://localhost:3000](http://localhost:3000). For development, use `npm run dev` instead of the last two commands. Do not run development and production servers on the same port simultaneously.
+
+The server listens on all local interfaces. For friends on the same trusted Wi-Fi/LAN, open `http://YOUR_LAN_IP:3000` on each device; permit the port through Windows Firewall only for the intended private network. Everyone must use the same reachable address. A shared `localhost` link does not work on another person's computer. Public hosting is **not configured** by a GitHub push.
+
+## Play the first stack
+
+1. Click **Start a stack**, choose a nickname, select a word, and draw it. Publish Floor 1.
+2. Share its link with another browser profile, private window, device, or coworker. A second tab in the same browser normally shares the same player cookie.
+3. That player guesses the word. Wrong answers have a visible cross and consume one of five tries; one try returns every minute. Correct guesses unlock the answer, comments, and the next-floor editor.
+4. Publish an independent drawing of the same word. Each player contributes at most one floor per stack. Stacks finish at 50 floors.
+
+Likes attach to the selected drawing's artist, not the stack founder. Comments unlock only after solving (or for the creator) to reduce spoilers. Rankings count floors, distinct solved stacks, and current drawing likes.
+
+## Drawing tools
+
+Pencil and marker with separate remembered width/opacity, 10 colors and custom HEX, pixel eraser, connected fill with tolerance, line/rectangle/ellipse, rectangular select/move/delete, 50-step undo/redo, confirmed clear, zoom 25–200%, fit and pan. Hold Shift to constrain shapes; Space-drag pans. Keyboard: B/M/E/G/V/H, [ / ], Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z.
+
+Drafts autosave to **this browser/device** after completed actions; a reload restores the drawing but not its undo history. `Save & exit` refuses to discard a draft if browser storage fails. Drawings publish as validated 960 × 640 PNGs. Blank drawings are rejected. Failed or conflicting publications keep the draft; a stale relay offers the latest floor for review before retrying.
+
+## Data and identity
+
+- Published state: `data/drawstacks.db` (SQLite WAL), including drawings and thumbnails. It survives server restarts. Set `DRAWSTACKS_DB` to use another persistent filesystem path.
+- Private identity: opaque, HTTP-only, same-site browser cookie, valid for 30 days. The database stores a token hash; public user IDs cannot authenticate. Clearing/expiring cookies creates a new player; there is no password recovery or cross-device login in v1.
+- Drafts: local storage, separated by player and stack. They are not uploaded before publication and are not synchronized across devices.
+- Back up the database with the server stopped, or use a SQLite-aware backup tool. Do not copy only the main database while WAL writes are active.
+- Never commit `data/`, cookies, `.env`, screenshots containing real private state, or production player data.
+
+## Verify
+
+```sh
+npm run typecheck
+npm test
+npm run format:check
+npm run build
+npm run test:api
+# Optional browser verification (install test browser once):
+npx playwright install chromium
+npm run test:browser
+```
+
+Unit tests use memory or a temporary isolated database. HTTP tests start a separate production server on port 3101; browser tests use port 3100. Both create new ignored databases under `data/` and never use the normal player database. A production build is required before integration/browser tests. Browser evidence is generated under ignored `test-results/qa/`; test runs clear old output. The browser suite covers two isolated players, drawing controls, draft recovery, answer/like/comment/relay workflows, share fallback, ranking tabs, and responsive captures.
+
+## Implementation map
+
+- `src/lib/game.ts`: authoritative rules, schema, validation, transactions, ranking and SQLite persistence.
+- `src/app/api/[...path]/route.ts`: same-origin JSON API, cookie identity and image delivery.
+- `src/components/GameApp.tsx`: home, identity, stack/guess/social flows and rankings.
+- `src/components/DrawingEditor.tsx`: interactive Canvas editor and local draft lifecycle.
+- `src/lib/paint.ts`: connected raster fill algorithm.
+- `src/app/globals.css`: self-hosted Patrick Hand/Nunito typography, cream theme and responsive layouts.
+- [Architecture and handoff](docs/implementation-v1.md)
+
+## Scope and limits
+
+This release is for trusted friends/LAN play. Anonymous cookies are **not** a public anti-cheat account system: people can create additional identities. No moderation, account recovery, drawing recognition, content reporting, distributed database, real-time push, or public deployment is included. Drawings can contain written hints; the app does not automatically police them. Refresh stacks/rankings to see new activity. SQLite and synchronous PNG processing suit small groups, not unmeasured public traffic.
+
+The supported framework versions are locked in `package-lock.json`. They intentionally supersede the old Next.js 14 / Excalidraw assumptions: current Next.js is used, with a custom raster Canvas for true pixel erasing and fill. Node's built-in SQLite API is documented at [nodejs.org](https://nodejs.org/api/sqlite.html).
 
 - [First-version design and acceptance scenarios](docs/design-v1.md)
 - [Change history and development handoff](CHANGELOG.md)
@@ -33,7 +103,7 @@ Mockups illustrate the design direction. The written specification defines inter
 
 ## Next implementation milestone
 
-Validate the editor's brush, eraser, fill, undo, and draft capabilities; then implement the local/LAN drawing–guessing–relay loop. Add floor-level comments, likes, sharing, and the three rankings. Revalidate dependencies before selecting versions.
+Finish any browser/visual acceptance gaps recorded in `design-qa.md`, then conduct a real multi-device LAN playtest. Before public hosting, agree on persistent hosting, durable accounts, moderation and abuse controls.
 
 ## Team handoff
 
