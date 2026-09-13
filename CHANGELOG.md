@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-13 — Per-floor answers, solve reveals and live activity
+
+- Changed the relay contract so every artist privately defines 1–10 accepted answers for their own floor. The first correct solver must set a new answer list before drawing the next floor; answers never carry forward automatically. Artists may return later in an A → B → C → A relay.
+- Scoped guesses, five-try recovery and solve credit to the latest floor. The first correct solve locks the next drawing opportunity; later guesses are rejected because the answer has already been revealed.
+- Added an automatic public solve activity card showing the solved drawing, winner's exact guess and the artist's complete accepted-answer list. Added an in-app notification bell for artists, unread counts and mark-read behavior.
+- Added visible-page polling for home stacks, stack state, floor activity and notifications so another player's solve or publication appears without a manual refresh. This is 3–5 second near-real-time polling, not WebSocket push.
+- Added an idempotent SQLite migration that copies legacy stack answers to floors, introduces floor-scoped guesses/meters and notification storage, and removes the old one-floor-per-artist constraint without resetting player data.
+- Verification: formatting, TypeScript, production build, one real HTTP integration test and 17 unit/migration tests passed. Coverage includes answer privacy, case-insensitive multilingual matching, public reveal events, artist notifications, first-solver locking, required next-floor answers, alternating artists, persistence and foreign-key integrity. Browser scenarios were updated but not executed; the existing browser QA limitation remains.
+- Handoff: browser-test the notification popover, solve card, short-poll updates and A → B → C → A flow when an automated browser is available. V1 has no timeout/reassignment if the winning solver abandons the next-floor draft. Source, migration, tests, docs and this log must be committed and pushed together; no runtime database is included.
+- Synchronization status: the feature is committed locally, but repeated GitHub HTTPS/HTTP 1.1 push attempts failed with connection resets/timeouts on 2026-09-13. Upload and remote-HEAD verification remain pending; retry a normal, never forced, `git push origin main` when GitHub connectivity returns.
+
 ## 2026-09-13 — Creator-defined multilingual accepted answers
 
 - Removed the built-in word bank, automatic synonyms, suggestion picker and `/api/words` endpoint. Creators now enter their own comma-separated words/phrases in an English **Accepted answers** form.
@@ -9,7 +20,7 @@
 - Added editable-answer draft autosave, unfinished input restoration and cancel-edit behavior. Updated all affected instructions, success text, sharing copy and metadata in English. Non-English text is allowed as user content, not interface chrome.
 - Verification: 16 passing unit tests and one passing real HTTP integration test, covering both example answers with separate players, normalization, invalid input, privacy, unchanged relay answers and persistence; TypeScript and production build passed. Browser test cases were updated but not executed: the previously documented browser verification/permission gap remains.
 - Handoff: test custom-answer entry/edit/reload and narrow-screen wrapping in the browser when available. Setup and architecture docs reflect the new contract. Source, tests and log are committed together; no runtime data is included.
-- Synchronization status: initial fetch/push and an HTTP/1.1 retry failed with connection resets / inability to connect to github.com:443. Feature commit `72b131e` is preserved locally; upload and remote verification remain pending. Retry a normal (never forced) push when connectivity returns.
+- Synchronization status: the initial push was interrupted by a temporary GitHub connection failure; the retry succeeded in follow-up commit `e28ffa0` and remote `main` was verified.
 
 ## 2026-09-13 — First playable local/LAN game
 

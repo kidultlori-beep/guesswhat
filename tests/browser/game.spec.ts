@@ -138,7 +138,7 @@ test("two players create, guess, relay, socialize, share and rank; real desktop/
   await page
     .getByRole("button", { name: "Publish stack", exact: true })
     .click();
-  await expect(page.getByText("Your stack is growing.")).toBeVisible();
+  await expect(page.getByText("Waiting for a guess.")).toBeVisible();
   const stackPath = new URL(page.url()).pathname,
     detail = await (await page.request.get(`/api${stackPath}`)).json(),
     floor = detail.floors[0].id;
@@ -171,6 +171,9 @@ test("two players create, guess, relay, socialize, share and rank; real desktop/
   await expect(
     player.getByRole("heading", { name: "You got it!" }),
   ).toBeVisible();
+  await expect(player.locator(".solve-event")).toContainText(
+    "Correct guess: “雨伞”",
+  );
   await player.getByRole("button", { name: "Like 0", exact: true }).click();
   await expect(
     player.getByRole("button", { name: "Like 1", exact: true }),
@@ -186,12 +189,16 @@ test("two players create, guess, relay, socialize, share and rank; real desktop/
   await expect(
     player.getByRole("heading", { name: "Add floor 2" }),
   ).toBeVisible();
+  await player
+    .getByLabel("Accepted answers", { exact: true })
+    .fill("ROCKET,火箭");
+  await player.getByRole("button", { name: "Save answers & draw" }).click();
   await drawUmbrella(player);
   await player
     .getByRole("button", { name: "Publish floor", exact: true })
     .click();
   await expect(player.getByText("2 / 50 floors")).toBeVisible();
-  await expect(player.getByText("You’ve added your floor.")).toBeVisible();
+  await expect(player.getByText("Waiting for a guess.")).toBeVisible();
   await player.getByRole("button", { name: "Floor 1 Jamie" }).click();
   await player
     .getByRole("button", { name: "Delete comment", exact: true })
@@ -224,6 +231,13 @@ test("two players create, guess, relay, socialize, share and rank; real desktop/
   await player.getByRole("button", { name: "Close profile" }).click();
   await page.goto("/");
   await expect(page.locator(".stack-card")).toHaveCount(1);
+  await expect(
+    page.getByRole("button", { name: /Notifications, 1 unread/ }),
+  ).toBeVisible({ timeout: 8000 });
+  await page.getByRole("button", { name: /Notifications/ }).click();
+  await expect(page.locator(".notification-menu")).toContainText(
+    "Alex guessed “雨伞”",
+  );
   await page.screenshot({
     path: "test-results/qa/home-desktop.png",
     fullPage: true,

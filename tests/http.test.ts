@@ -131,19 +131,18 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   ).json();
   assert.equal(solve.correct, true);
   assert.equal(solve.state.canDraw, true);
+  assert.equal((await call(`floors/${s.floor}/comments`)).status, 200);
   const c = await player("HTTP Charlie");
   assert.equal(
     (
-      await (
-        await call(
-          `stacks/${s.id}/guess`,
-          "POST",
-          { guess: "  elon  musk  " },
-          c.cookie,
-        )
-      ).json()
-    ).correct,
-    true,
+      await call(
+        `stacks/${s.id}/guess`,
+        "POST",
+        { guess: "  elon  musk  " },
+        c.cookie,
+      )
+    ).status,
+    409,
   );
   assert.equal(
     (
@@ -180,25 +179,38 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   const comments = await (
     await call(`floors/${s.floor}/comments`, "GET", undefined, a.cookie)
   ).json();
-  assert.equal(comments.comments[0].text, "Lovely!");
+  const posted = comments.comments.find(
+    (item: { kind: string }) => item.kind === "comment",
+  );
+  const solved = comments.comments.find(
+    (item: { kind: string }) => item.kind === "solve",
+  );
+  assert.equal(posted.text, "Lovely!");
+  assert.equal(solved.guess, "马斯克");
+  assert.equal(solved.answers, "ELON MUSK,马斯克");
   assert.equal(
-    (await call(`comments/${comments.comments[0].id}`, "DELETE", {}, a.cookie))
-      .status,
+    (await call(`comments/${posted.id}`, "DELETE", {}, a.cookie)).status,
     404,
   );
   assert.equal(
-    (await call(`comments/${comments.comments[0].id}`, "DELETE", {}, b.cookie))
-      .status,
+    (await call(`comments/${posted.id}`, "DELETE", {}, b.cookie)).status,
     200,
   );
   const relay = await call(
     `stacks/${s.id}/draw`,
     "POST",
-    { image, parent: s.floor, key: "http-relay-1" },
+    { image, word: "rocket,火箭", parent: s.floor, key: "http-relay-1" },
     b.cookie,
   );
   assert.equal(relay.status, 201);
   assert.equal((await (await call(`stacks/${s.id}`)).json()).floors.length, 2);
+  const alerts = await (
+    await call("notifications", "GET", undefined, a.cookie)
+  ).json();
+  assert.equal(alerts.notifications[0].actor, "HTTP Bob");
+  assert.equal(alerts.notifications[0].guess, "马斯克");
+  assert.equal(alerts.notifications[0].read, false);
+  assert.equal((await call("notifications", "PUT", {}, a.cookie)).status, 200);
   const rank = await (await call("leaderboards?tab=artists")).json();
   assert.equal(rank.rows[0].id, a.user.id);
   assert.equal(rank.rows[0].score, 1);

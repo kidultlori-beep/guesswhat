@@ -11,12 +11,13 @@ No sample stacks are inserted on normal startup. All test state is isolated. Sel
 | Table | Responsibility / constraints |
 | --- | --- |
 | users | Public UUID, nickname, hashed private session token, expiration |
-| stacks | Neutral sequential public number, opaque UUID, private comma-separated accepted answers in legacy `word` column, founder, times |
-| floors | Validated original/preview PNGs, author, stack, ordered index; unique author/stack and index/stack |
-| guesses | Private normalized guesses; unique player/stack/text, partial unique first correct solve |
-| meters | Remaining attempts and server-time recovery anchor per player/stack |
+| stacks | Neutral sequential public number, opaque UUID, founder, times; legacy `word` mirrors Floor 1 for compatibility |
+| floors | Validated original/preview PNGs, artist, stack, ordered index and that floor's private comma-separated answers; unique index/stack |
+| floor_guesses | Floor-scoped private normalized guesses; one first correct solve per floor |
+| floor_meters | Remaining attempts and server-time recovery anchor per player/floor |
+| notifications | Correct-solve alerts for the drawing artist, including read state |
 | likes | Unique player/floor, original event time; self-like rejected |
-| comments | Plain text, owner and target floor; access requires stack solve or founder |
+| comments | Plain text, owner and target floor; public after that floor is solved, privately available to its artist beforehand |
 | publications | Player + idempotency key → original publication result |
 
 Publishing and guessing use `BEGIN IMMEDIATE` transactions. Publishing checks eligibility, the 50-floor cap and expected latest parent before allocating the next floor. New-stack creation and Floor 1 are atomic. Database initialization is idempotent. Future schema changes need explicit migrations before modifying an existing installation.
@@ -29,15 +30,16 @@ Mutations need `X-DrawStacks: 1`; browser Origin must match Host. The session co
 | --- | --- | --- |
 | GET / PUT | `/api/me` | Current identity / choose or update nickname |
 | GET / POST | `/api/stacks` | Twelve public stack summaries (offset pagination) / publish a new stack |
-| GET | `/api/stacks/:id` | Public floors and only the requesting player's private solve/attempt state |
+| GET | `/api/stacks/:id` | Public floors plus requester state for the latest floor; answers appear only to its artist/solver or after reveal |
 | POST | `/api/stacks/:id/guess` | Correct/duplicate flags plus fresh requester-specific state |
-| POST | `/api/stacks/:id/draw` | Publish relay with `parent`, `image`, `key` |
+| POST | `/api/stacks/:id/draw` | Winner publishes relay with `parent`, new `word` answers, `image`, `key` |
 | GET | `/api/floors/:id/image?preview=1` | Immutable PNG thumbnail; omit query for original |
 | PUT | `/api/floors/:id/like` | Set explicit boolean `liked`, safe to retry |
 | GET / POST | `/api/floors/:id/comments` | Read/post authorized plain-text comments |
 | DELETE | `/api/comments/:id` | Owner-only deletion |
 | GET | `/api/leaderboards?tab=stacks\|guessers\|artists` | All-time top 20 and current player's rank where relevant |
 | GET | `/api/users/:id/contributions` | Public authored floors, never secret answers or guesses |
+| GET / PUT | `/api/notifications` | Current player's solve alerts / mark all read |
 
 Client errors use `{error: "readable message"}`. Expected statuses: 400 invalid content, 401 missing session, 403 denied, 404 missing, 409 publication conflict, 413 oversized body, 429 wait/refill or comment throttling. Do not replace this with client-only authorization.
 
@@ -45,7 +47,9 @@ Client errors use `{error: "readable message"}`. Expected statuses: 400 invalid 
 
 `POST /api/stacks` retains the compatible `word` field but now accepts user-written English-comma-separated answers, e.g. `ELON MUSK,马斯克`. `src/lib/answers.ts` shares validation between browser and server: 1–10 distinct entries, 80 characters per entry, 809 input characters total; trim/collapse whitespace, NFC normalization and case-insensitive deduplication while preserving first-entry spelling. Empty entries, full-width comma separators and control characters are rejected with English messages. `/api/words` is removed (404); there are no built-in aliases or suggestions.
 
-Guesses must match one complete normalized entry; do not split a submitted guess into multiple guesses or accept substrings. Server response `word` is still null for unsolved viewers, and otherwise contains the canonical comma-separated list. Relay bodies cannot overwrite answers. No schema migration or player-data rewrite is needed: legacy single-word values naturally form a one-entry list. Already recorded solves remain valid, but implicit old word-bank synonyms no longer grant new solves.
+Guesses must match one complete normalized entry; do not split a submitted guess into multiple guesses or accept substrings. Each floor owns its answer list. Server response `word` describes only the latest floor and is null for unsolved viewers other than its artist; revealed floor rows expose their own `answers`. The first correct guess atomically locks the right to publish the next floor, reveals the accepted answers, creates a public solve event and alerts the artist. Further guesses against that solved floor are rejected while the winner draws.
+
+The startup migration adds per-floor answers, guesses, attempt meters and notifications, copies each legacy stack answer to its existing floors, and removes the former unique artist/stack restriction. Legacy solve/attempt tables remain for compatibility and are migrated without deleting player data. This permits A → B → C → A relays while keeping unique floor order and stale-parent checks.
 
 Drafts retain the compatible `word` field and add `answerInput` for unfinished edits; older drafts without the extra field still restore. All interface copy remains English, including validation; user-entered answers can use other languages. Never include private answer lists in public titles, previews, lists, rankings or share text.
 
@@ -67,7 +71,8 @@ Rankings are calculated from persisted current data, not client counters. Scores
 
 - Single server with persistent disk. Ephemeral/serverless filesystems are not a suitable deployment unchanged.
 - No authentication recovery, moderation, public write quotas for nickname/stack creation, or competitive anti-cheat. Comments have a 10/min/player cap; other abuse controls are future work.
-- Stack updates are manual refresh. No WebSocket presence or live editor synchronization.
+- Home, open stacks, solve activity and notifications poll every 3–5 seconds while visible. There is no WebSocket presence or live editor synchronization.
+- The first correct solver owns the next publication opportunity. V1 has no timeout or reassignment if that player abandons the draft.
 - Comments currently return the first 200 per floor; contribution previews return the latest 100. Add pagination before large-scale usage.
 - Stop the server before taking a plain-file backup. Do not delete live databases to reset tests; test runners already isolate their data.
 - Browser and visual verification status must be read from the root QA report. Automated tests are not a substitute for real phone/LAN device playtests.

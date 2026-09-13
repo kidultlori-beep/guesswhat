@@ -23,6 +23,9 @@ export interface Floor {
   likes: number;
   liked: boolean;
   comments: number;
+  answers: string | null;
+  revealed: boolean;
+  solves: number;
 }
 export interface StackDetail {
   id: string;
@@ -30,7 +33,8 @@ export interface StackDetail {
   creator: string;
   creatorId: string;
   floors: Floor[];
-  // Comma-separated accepted answers, visible only to the creator/solved player.
+  // Latest floor's comma-separated answers, visible only after that floor is solved
+  // (or privately to its artist / successful guesser).
   word: string | null;
   solved: boolean;
   contributed: boolean;
@@ -39,13 +43,28 @@ export interface StackDetail {
   resetAt: number | null;
   now: number;
   guesses: { text: string; correct: boolean }[];
+  targetFloorId: string;
 }
 export interface Comment {
   id: string;
   author: string;
   authorId: string;
-  text: string;
+  text: string | null;
   created: number;
+  kind: "comment" | "solve";
+  guess?: string;
+  answers?: string;
+}
+export interface Notification {
+  id: string;
+  actor: string;
+  floorId: string;
+  stackId: string;
+  stackNumber: number;
+  floor: number;
+  guess: string;
+  created: number;
+  read: boolean;
 }
 export interface RankRow {
   id: string;

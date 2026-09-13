@@ -7,6 +7,7 @@ import { floodFill } from "../src/lib/paint";
 import { mkdtempSync, existsSync, unlinkSync, rmdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 function drawing(blank = false) {
   const png = new PNG({ width: 960, height: 640 });
   if (!blank)
@@ -84,7 +85,7 @@ test("exact phrase matching accepts either language, not partials or comma-separ
   assert.equal(matchesAnswer(" CAT ", "cat"), true);
   assert.equal(matchesAnswer("CAFÉ", "Cafe\u0301"), true);
 });
-test("each custom alias independently solves and relay cannot change accepted answers", (t) => {
+test("a correct answer reveals that floor, creates a public event and notifies its artist", (t) => {
   const { game, a, b, c } = setup(t);
   const s = game.publish(a.user.id, {
     word: " ELON   MUSK,马斯克,elon musk ",
@@ -100,21 +101,34 @@ test("each custom alias independently solves and relay cannot change accepted an
   assert(!publicData.includes("ELON MUSK"));
   assert(!publicData.includes("马斯克"));
   assert.equal(game.guess(b.user.id, s.id, "elon  musk").correct, true);
-  assert.equal(game.guess(c.user.id, s.id, "马斯克").correct, true);
+  assert.throws(() => game.guess(c.user.id, s.id, "马斯克"), status(409));
   assert.equal(game.guess(b.user.id, s.id, "马斯克").duplicate, true);
   assert.equal(game.rankings("guessers", b.user.id).mine?.score, 1);
   assert.equal(game.detail(s.id, b.user.id).remaining, 5);
   game.publish(
     b.user.id,
     {
-      word: "unauthorized replacement",
+      word: "SPACE X,太空探索技术公司",
       image: picture,
       key: "custom-relay-1",
       parent: s.floor,
     },
     s.id,
   );
-  assert.equal(game.detail(s.id, c.user.id).word, "ELON MUSK,马斯克");
+  const detail = game.detail(s.id, c.user.id);
+  assert.equal(detail.floors[0].answers, "ELON MUSK,马斯克");
+  assert.equal(detail.word, null);
+  const events = game.comments(undefined, s.floor);
+  assert.equal(events[0].kind, "solve");
+  assert.equal(events[0].guess, "elon musk");
+  assert.equal(events[0].answers, "ELON MUSK,马斯克");
+  const notifications = game.notifications(a.user.id);
+  assert.equal(notifications.length, 1);
+  assert.equal(notifications[0].actor, "Bob");
+  assert.equal(notifications[0].guess, "elon musk");
+  assert.equal(notifications[0].read, false);
+  game.readNotifications(a.user.id);
+  assert.equal(game.notifications(a.user.id)[0].read, true);
   assert.throws(
     () =>
       game.publish(a.user.id, {
@@ -137,9 +151,16 @@ test("sessions are private, expiring, independent from public ids", (t) => {
 });
 test("existing single-answer stacks work without a migration or automatic aliases", (t) => {
   const { game, b, c, s } = setup(t);
-  game.db.prepare("UPDATE stacks SET word=? WHERE id=?").run("bicycle", s.id);
+  game.db
+    .prepare("UPDATE floors SET answers=? WHERE id=?")
+    .run("bicycle", s.floor);
   assert.equal(game.guess(b.user.id, s.id, "BICYCLE").correct, true);
-  assert.equal(game.guess(c.user.id, s.id, "bike").correct, false);
+  const other = game.publish(c.user.id, {
+    word: "bicycle",
+    image: picture,
+    key: "legacy-single-2",
+  });
+  assert.equal(game.guess(b.user.id, other.id, "bike").correct, false);
 });
 test("answer and other players guesses never leak to unsolved viewers", (t) => {
   const { game, a, b, c, s } = setup(t);
@@ -178,7 +199,7 @@ test("tries decrement once, normalize duplicates, refill on server time, correct
   advance(600000);
   assert.equal(game.detail(s.id, b.user.id).remaining, 5);
 });
-test("relay requires solve, one floor/player, stale parent conflict, idempotent retry", (t) => {
+test("relay requires solving latest floor, new answers, and supports alternating artists", (t) => {
   const { game, a, b, c, s } = setup(t);
   assert.deepEqual({ ...game.publish(a.user.id, { key: "initial-0001" }) }, s);
   assert.throws(() => game.guess(a.user.id, s.id, "bicycle"), status(403));
@@ -186,16 +207,15 @@ test("relay requires solve, one floor/player, stale parent conflict, idempotent 
     () =>
       game.publish(
         b.user.id,
-        { image: picture, key: "unsolved-01", parent: s.floor },
+        { image: picture, word: "cat", key: "unsolved-01", parent: s.floor },
         s.id,
       ),
     status(403),
   );
   game.guess(b.user.id, s.id, "bike");
-  game.guess(c.user.id, s.id, "bicycle");
   const second = game.publish(
     b.user.id,
-    { image: picture, key: "second-0001", parent: s.floor },
+    { image: picture, word: "cat,kitty", key: "second-0001", parent: s.floor },
     s.id,
   );
   assert.deepEqual(
@@ -206,27 +226,44 @@ test("relay requires solve, one floor/player, stale parent conflict, idempotent 
     () =>
       game.publish(
         b.user.id,
-        { image: picture, key: "second-0002", parent: second.floor },
+        {
+          image: picture,
+          word: "dog",
+          key: "second-0002",
+          parent: second.floor,
+        },
         s.id,
       ),
-    status(409),
+    status(403),
   );
   assert.throws(
     () =>
       game.publish(
         c.user.id,
-        { image: picture, key: "third-0001", parent: s.floor },
+        { image: picture, word: "dog", key: "third-0001", parent: s.floor },
         s.id,
       ),
-    status(409),
+    status(403),
   );
-  game.publish(
+  game.guess(c.user.id, s.id, "kitty");
+  const third = game.publish(
     c.user.id,
-    { image: picture, key: "third-0001", parent: second.floor },
+    {
+      image: picture,
+      word: "dog,puppy",
+      key: "third-0001",
+      parent: second.floor,
+    },
     s.id,
   );
-  assert.equal(game.detail(s.id).floors.length, 3);
-  assert.equal(game.rankings("stacks").rows[0].score, 3);
+  game.guess(a.user.id, s.id, "puppy");
+  game.publish(
+    a.user.id,
+    { image: picture, word: "moon", key: "fourth-0001", parent: third.floor },
+    s.id,
+  );
+  assert.equal(game.detail(s.id).floors.length, 4);
+  assert.equal(game.rankings("stacks").rows[0].score, 4);
 });
 test("blank, malformed, wrong-size images rejected and no orphan stacks created", (t) => {
   const { game, a } = setup(t);
@@ -291,12 +328,18 @@ test("comments locked until solved, validated, plain text, owner-only delete", (
   );
   const comment = game.comment(b.user.id, s.floor, "<b>Great drawing!</b>");
   assert.equal(
-    game.comments(a.user.id, s.floor)[0].text,
+    game.comments(a.user.id, s.floor).find((event) => event.kind === "comment")!
+      .text,
     "<b>Great drawing!</b>",
   );
   assert.throws(() => game.removeComment(c.user.id, comment.id), status(404));
   game.removeComment(b.user.id, comment.id);
-  assert.equal(game.comments(a.user.id, s.floor).length, 0);
+  assert.equal(
+    game
+      .comments(a.user.id, s.floor)
+      .filter((event) => event.kind === "comment").length,
+    0,
+  );
 });
 test("50 floors completes stack, guesses and likes remain open", (t) => {
   const { game, a, b, s } = setup(t);
@@ -306,8 +349,19 @@ test("50 floors completes stack, guesses and likes remain open", (t) => {
   for (let i = 2; i <= 50; i++) {
     const u = game.identify(`Builder ${i}`).user;
     game.db
-      .prepare("INSERT INTO floors VALUES(?,?,?,?,?,?,?)")
-      .run(`floor-${i}`, s.id, u.id, i, row.image, row.preview, game.now() + i);
+      .prepare(
+        "INSERT INTO floors(id,stack_id,author_id,floor_index,image,preview,created,answers) VALUES(?,?,?,?,?,?,?,?)",
+      )
+      .run(
+        `floor-${i}`,
+        s.id,
+        u.id,
+        i,
+        row.image,
+        row.preview,
+        game.now() + i,
+        "bike",
+      );
   }
   game.guess(b.user.id, s.id, "bike");
   assert.equal(game.detail(s.id, b.user.id).canDraw, false);
@@ -327,7 +381,12 @@ test("ranking ties use earlier most-recent counted activity", (t) => {
   const { game, a, b, c, s, advance } = setup(t);
   game.guess(b.user.id, s.id, "bike");
   advance(100);
-  game.guess(c.user.id, s.id, "bike");
+  const tie = game.publish(a.user.id, {
+    word: "cat",
+    image: picture,
+    key: "ranking-tie-2",
+  });
+  game.guess(c.user.id, tie.id, "cat");
   assert.equal(game.rankings("guessers").rows[0].id, b.user.id);
   const other = game.publish(c.user.id, {
     word: "cat",
@@ -370,8 +429,79 @@ test("server restart preserves drawings, identity, guesses and statistics", () =
     assert.equal(game.user(a.token)?.id, a.user.id);
     assert.equal(game.detail(s.id, b.user.id).word, "ELON MUSK,马斯克");
     assert.equal(game.detail(s.id).floors[0].likes, 1);
-    assert.equal(game.comments(a.user.id, s.floor)[0].text, "Still here");
+    assert.equal(
+      game
+        .comments(a.user.id, s.floor)
+        .find((event) => event.kind === "comment")!.text,
+      "Still here",
+    );
     assert.equal(game.rankings("guessers").rows[0].score, 1);
+  } finally {
+    game?.db.close();
+    for (const file of [path, `${path}-shm`, `${path}-wal`])
+      if (existsSync(file)) unlinkSync(file);
+    rmdirSync(dir);
+  }
+});
+test("legacy stack database migrates answers per floor and allows artists to return", () => {
+  const dir = mkdtempSync(join(tmpdir(), "drawstacks-legacy-")),
+    path = join(dir, "legacy.sqlite");
+  let game: Game | undefined;
+  try {
+    const legacy = new DatabaseSync(path);
+    legacy.exec(`PRAGMA foreign_keys=ON;
+      CREATE TABLE users(id TEXT PRIMARY KEY,nickname TEXT NOT NULL,session_hash TEXT UNIQUE NOT NULL,expires INTEGER NOT NULL);
+      CREATE TABLE stacks(number INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT UNIQUE NOT NULL,word TEXT NOT NULL,creator_id TEXT NOT NULL REFERENCES users(id),created INTEGER NOT NULL,updated INTEGER NOT NULL);
+      CREATE TABLE floors(id TEXT PRIMARY KEY,stack_id TEXT NOT NULL REFERENCES stacks(id),author_id TEXT NOT NULL REFERENCES users(id),floor_index INTEGER NOT NULL,image BLOB NOT NULL,preview BLOB NOT NULL,created INTEGER NOT NULL,UNIQUE(stack_id,floor_index),UNIQUE(stack_id,author_id));
+      CREATE TABLE guesses(id INTEGER PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),stack_id TEXT NOT NULL REFERENCES stacks(id),text TEXT NOT NULL,correct INTEGER NOT NULL,created INTEGER NOT NULL,UNIQUE(user_id,stack_id,text));`);
+    legacy
+      .prepare("INSERT INTO users VALUES(?,?,?,?)")
+      .run("a", "Legacy A", "hash-a", 9999999999999);
+    legacy
+      .prepare("INSERT INTO users VALUES(?,?,?,?)")
+      .run("b", "Legacy B", "hash-b", 9999999999999);
+    legacy
+      .prepare(
+        "INSERT INTO stacks(id,word,creator_id,created,updated) VALUES(?,?,?,?,?)",
+      )
+      .run("stack", "cat,猫", "a", 1, 1);
+    const pixels = Buffer.from(picture.split(",")[1], "base64");
+    legacy
+      .prepare("INSERT INTO floors VALUES(?,?,?,?,?,?,?)")
+      .run("floor-1", "stack", "a", 1, pixels, pixels, 1);
+    legacy.close();
+    game = new Game(path);
+    assert.equal(game.detail("stack", "a").word, "cat,猫");
+    assert.deepEqual(game.db.prepare("PRAGMA foreign_key_check").all(), []);
+    const schema = (
+      game.db
+        .prepare("SELECT sql FROM sqlite_master WHERE name='floors'")
+        .get() as { sql: string }
+    ).sql;
+    assert(!/UNIQUE\s*\(\s*stack_id\s*,\s*author_id/i.test(schema));
+    game.guess("b", "stack", "猫");
+    const second = game.publish(
+      "b",
+      {
+        word: "dog,狗",
+        image: picture,
+        key: "legacy-next-1",
+        parent: "floor-1",
+      },
+      "stack",
+    );
+    game.guess("a", "stack", "dog");
+    game.publish(
+      "a",
+      {
+        word: "moon,月亮",
+        image: picture,
+        key: "legacy-return-1",
+        parent: second.floor,
+      },
+      "stack",
+    );
+    assert.equal(game.detail("stack").floors.length, 3);
   } finally {
     game?.db.close();
     for (const file of [path, `${path}-shm`, `${path}-wal`])

@@ -99,10 +99,10 @@ export default function DrawingEditor({
     history = useRef<string[]>([]),
     historyIndex = useRef(0),
     restoring = useRef(false);
-  const [word, setWord] = useState(stack?.word || ""),
-    [answerInput, setAnswerInput] = useState(stack?.word || ""),
+  const [word, setWord] = useState(""),
+    [answerInput, setAnswerInput] = useState(""),
     [answerError, setAnswerError] = useState(""),
-    [choosing, setChoosing] = useState(!stack?.word);
+    [choosing, setChoosing] = useState(true);
   const [reference, setReference] = useState(stack?.floors.at(-1)),
     [showReference, setShowReference] = useState(false);
   const brushMemory = useRef({
@@ -225,13 +225,12 @@ export default function DrawingEditor({
       draft.image.startsWith("data:image/png;base64,") &&
       typeof draft.word === "string"
     ) {
-      wordRef.current = stack?.word || draft.word;
+      wordRef.current = draft.word;
       setWord(wordRef.current);
       answerInputRef.current =
-        stack?.word ||
-        (typeof draft.answerInput === "string"
+        typeof draft.answerInput === "string"
           ? draft.answerInput
-          : wordRef.current);
+          : wordRef.current;
       setAnswerInput(answerInputRef.current);
       setChoosing(
         !wordRef.current || answerInputRef.current !== wordRef.current,

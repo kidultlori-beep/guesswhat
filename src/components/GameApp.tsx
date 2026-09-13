@@ -21,6 +21,7 @@ import {
   X,
   Buildings,
   Lightbulb,
+  Bell,
 } from "@phosphor-icons/react";
 import type {
   User,
@@ -28,6 +29,7 @@ import type {
   StackDetail,
   Comment,
   RankRow,
+  Notification,
 } from "@/lib/types";
 import { api, imageUrl, stackName, errorMessage } from "@/lib/client";
 import { MAX_ANSWER_LENGTH } from "@/lib/answers";
@@ -40,6 +42,8 @@ export default function GameApp() {
     [user, setUser] = useState<User | null>(null),
     [ready, setReady] = useState(false),
     [identityOpen, setIdentityOpen] = useState(false),
+    [notifications, setNotifications] = useState<Notification[]>([]),
+    [notificationsOpen, setNotificationsOpen] = useState(false),
     [error, setError] = useState("");
   const pending = useRef<(() => void) | null>(null);
   const loadIdentity = useCallback(() => {
@@ -52,6 +56,32 @@ export default function GameApp() {
       .catch((e) => setError(errorMessage(e)));
   }, []);
   useEffect(loadIdentity, [loadIdentity]);
+  const loadNotifications = useCallback(() => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+    api<{ notifications: Notification[] }>("notifications")
+      .then((d) => setNotifications(d.notifications))
+      .catch(() => {});
+  }, [user]);
+  useEffect(() => {
+    loadNotifications();
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") loadNotifications();
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [loadNotifications]);
+  async function openNotifications() {
+    const open = !notificationsOpen;
+    setNotificationsOpen(open);
+    if (open && notifications.some((n) => !n.read)) {
+      setNotifications((items) => items.map((n) => ({ ...n, read: true })));
+      try {
+        await api("notifications", "PUT");
+      } catch {}
+    }
+  }
   useEffect(() => {
     const trap = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
@@ -111,6 +141,56 @@ export default function GameApp() {
             <Trophy size={26} /> Leaderboards
           </Link>
         </nav>
+        {user && (
+          <div className="notification-wrap">
+            <button
+              className="notification-button"
+              aria-label={`Notifications${notifications.some((n) => !n.read) ? `, ${notifications.filter((n) => !n.read).length} unread` : ""}`}
+              aria-expanded={notificationsOpen}
+              onClick={openNotifications}
+            >
+              <Bell size={27} />
+              {notifications.some((n) => !n.read) && (
+                <span>{notifications.filter((n) => !n.read).length}</span>
+              )}
+            </button>
+            {notificationsOpen && (
+              <div className="notification-menu panel">
+                <h2>Your notifications</h2>
+                {notifications.length ? (
+                  notifications.map((n) => (
+                    <Link
+                      href={`/stacks/${n.stackId}?floor=${n.floorId}`}
+                      key={n.id}
+                      onClick={() => setNotificationsOpen(false)}
+                      className={n.read ? "" : "unread"}
+                    >
+                      <img src={imageUrl(n.floorId, true)} alt="" />
+                      <span>
+                        <strong>{n.actor}</strong> guessed “{n.guess}” and
+                        solved your Floor {n.floor}.
+                        <small>
+                          {stackName(n.stackNumber)} ·{" "}
+                          {new Date(n.created).toLocaleString("en", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </small>
+                      </span>
+                    </Link>
+                  ))
+                ) : (
+                  <p>
+                    No notifications yet. When somebody solves your drawing,
+                    you’ll see it here.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         <button
           className="identity"
           onClick={() => setIdentityOpen(true)}
@@ -174,7 +254,7 @@ export default function GameApp() {
       </main>
       {!isEditor && (
         <footer className="site-footer">
-          One subject. A new drawing on every floor.
+          New answers. A new drawing on every floor.
         </footer>
       )}
       {identityOpen && (
@@ -316,6 +396,12 @@ function Home({
   useEffect(() => {
     void load();
   }, [load, user?.id]);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [load]);
   return (
     <>
       <section className="hero">
@@ -363,13 +449,13 @@ function Home({
             </Link>
             <Link
               className="soft-button"
-              href={`/stacks/${s.id}${s.solved && !s.contributed && s.count < 50 ? "/draw" : ""}`}
+              href={`/stacks/${s.id}${s.solved && s.count < 50 ? "/draw" : ""}`}
             >
               {s.count >= 50
                 ? "View completed stack"
                 : s.contributed
                   ? "View this stack"
-                  : s.solved && s.count < 50
+                  : s.solved
                     ? "Draw the next floor"
                     : "Guess this stack"}
               <ArrowRight size={22} />
@@ -415,14 +501,23 @@ function StackPage({
   const router = useRouter(),
     [data, setData] = useState<StackDetail | null>(null),
     [error, setError] = useState(""),
-    [floorId, setFloorId] = useState("");
+    [floorId, setFloorId] = useState(""),
+    [liveNotice, setLiveNotice] = useState("");
   const revision = useRef(0);
+  const targetRef = useRef("");
   const load = useCallback(async () => {
     const request = ++revision.current;
     try {
       const r = await api<StackDetail>(`stacks/${id}`);
       if (request !== revision.current) return;
       setData(r);
+      if (targetRef.current && targetRef.current !== r.targetFloorId) {
+        setFloorId(r.targetFloorId);
+        setLiveNotice(
+          "A new floor was published. You are now viewing the latest drawing.",
+        );
+      }
+      targetRef.current = r.targetFloorId;
       setError("");
       setFloorId((current) =>
         r.floors.some((f) => f.id === current)
@@ -437,6 +532,13 @@ function StackPage({
   useEffect(() => {
     void load();
   }, [load, user?.id]);
+  useEffect(() => {
+    if (editor) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [editor, load]);
   if (!data)
     return (
       <div className="empty-state">
@@ -459,13 +561,13 @@ function StackPage({
         <div className="empty-state">
           <LockSimple size={48} />
           <h1>
-            {data.contributed
-              ? "You’ve already built here."
-              : data.floors.length >= 50
-                ? "This stack is complete!"
-                : "Solve it before you draw it."}
+            {data.floors.length >= 50
+              ? "This stack is complete!"
+              : "Solve it before you draw it."}
           </h1>
-          <p>Each player can add one floor to a stack.</p>
+          <p>
+            Guess the latest drawing correctly before starting the next floor.
+          </p>
           <Link className="primary" href={`/stacks/${id}`}>
             Back to this stack
           </Link>
@@ -507,6 +609,13 @@ function StackPage({
       {error && (
         <p className="notice error" role="alert">
           {error}
+        </p>
+      )}
+      {liveNotice && (
+        <p className="notice success" role="status">
+          <CheckCircle />
+          {liveNotice}
+          <button onClick={() => setLiveNotice("")}>Dismiss</button>
         </p>
       )}
       <div className="detail-grid">
@@ -620,23 +729,38 @@ function GuessPanel({
       setBusy(false);
     }
   }
-  const own = user?.id === data.creatorId,
+  const latest = data.floors.at(-1)!,
+    own = user?.id === latest.authorId,
     unlocked = !!data.word,
     wrong = data.guesses.filter((g) => !g.correct);
   return (
     <aside className="guess-panel panel">
       {unlocked ? (
         <>
-          <CheckCircle className="green" size={44} weight="duotone" />
-          <h2>{own ? "Your stack is growing." : "You got it!"}</h2>
-          <p>Accepted answers</p>
+          {latest.revealed ? (
+            <CheckCircle className="green" size={44} weight="duotone" />
+          ) : (
+            <Lightbulb className="blue" size={44} weight="duotone" />
+          )}
+          <h2>
+            {data.solved
+              ? "You got it!"
+              : own && !latest.revealed
+                ? "Waiting for a guess."
+                : "This floor was solved."}
+          </h2>
+          <p>
+            {latest.revealed
+              ? "The artist accepted"
+              : "Your private accepted answers"}
+          </p>
           <div className="revealed-word">
             {data.word?.split(",").join(" / ")}
           </div>
           {data.canDraw ? (
             <>
               <p>
-                Same subject. Your imagination.
+                Set new answers, then draw the next idea.
                 <br />
                 Add your drawing to the story.
               </p>
@@ -650,8 +774,12 @@ function GuessPanel({
               {data.floors.length >= 50
                 ? "50 floors! This stack is complete."
                 : own
-                  ? "Share it and let your friends guess."
-                  : "You’ve added your floor. See what others draw next!"}
+                  ? latest.revealed
+                    ? "Your drawing was solved — check your notification above."
+                    : "Share it and let your friends guess."
+                  : latest.revealed
+                    ? "The winner is drawing the next floor."
+                    : "See what others draw next!"}
             </p>
           )}
         </>
@@ -660,8 +788,8 @@ function GuessPanel({
           <Lightbulb size={39} className="blue" weight="duotone" />
           <h2>What’s the answer?</h2>
           <p>
-            Every floor shows the same subject. Guess one word or phrase. Match
-            any accepted answer to win.
+            Guess the latest drawing. Match any answer its artist set to win the
+            next drawing turn.
           </p>
           <form
             onSubmit={(e) => {
@@ -726,8 +854,8 @@ function GuessPanel({
       <div className="how-it-works">
         <h3>A little team effort</h3>
         <p>1. Guess an accepted answer.</p>
-        <p>2. Draw your take on it.</p>
-        <p>3. Watch the stack grow.</p>
+        <p>2. Set new answers and draw the next floor.</p>
+        <p>3. The next player continues the chain.</p>
       </div>
     </aside>
   );
@@ -752,7 +880,7 @@ function Social({
     [busy, setBusy] = useState(false),
     [deleteId, setDeleteId] = useState(""),
     [shareUrl, setShareUrl] = useState("");
-  const unlocked = !!data.word;
+  const unlocked = !!floor.answers;
   const load = useCallback(async () => {
     if (!unlocked) return;
     try {
@@ -766,7 +894,12 @@ function Social({
   }, [floor.id, unlocked]);
   useEffect(() => {
     void load();
-  }, [load]);
+    if (!unlocked) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [load, unlocked]);
   async function like() {
     setBusy(true);
     setError("");
@@ -895,38 +1028,65 @@ function Social({
                 No comments yet. Be the first to cheer them on.
               </p>
             )}
-            {comments.map((c) => (
-              <article className="comment" key={c.id}>
-                <Smiley size={29} className="blue" />
-                <div>
-                  <strong>{c.author}</strong>
-                  <time dateTime={new Date(c.created).toISOString()}>
-                    {new Date(c.created).toLocaleString("en", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </time>
-                  <p>{c.text}</p>
-                </div>
-                {c.authorId === user?.id && (
-                  <button
-                    aria-label="Delete comment"
-                    onClick={() => setDeleteId(c.id)}
-                  >
-                    <Trash size={18} />
-                  </button>
-                )}
-              </article>
-            ))}
+            {comments.map((c) =>
+              c.kind === "solve" ? (
+                <article className="solve-event" key={c.id}>
+                  <img
+                    src={imageUrl(floor.id, true)}
+                    alt={`Solved drawing by ${floor.author}`}
+                  />
+                  <div>
+                    <strong>
+                      {c.author} solved Floor {floor.index}!
+                    </strong>
+                    <p>Correct guess: “{c.guess}”</p>
+                    <p>Accepted answers: {c.answers?.split(",").join(" / ")}</p>
+                    <time dateTime={new Date(c.created).toISOString()}>
+                      {new Date(c.created).toLocaleString("en", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </time>
+                  </div>
+                </article>
+              ) : (
+                <article className="comment" key={c.id}>
+                  <Smiley size={29} className="blue" />
+                  <div>
+                    <strong>{c.author}</strong>
+                    <time dateTime={new Date(c.created).toISOString()}>
+                      {new Date(c.created).toLocaleString("en", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </time>
+                    <p>{c.text}</p>
+                  </div>
+                  {c.authorId === user?.id && (
+                    <button
+                      aria-label="Delete comment"
+                      onClick={() => setDeleteId(c.id)}
+                    >
+                      <Trash size={18} />
+                    </button>
+                  )}
+                </article>
+              ),
+            )}
           </>
         ) : (
           <div className="locked-comments">
             <LockSimple size={24} />
             <div>
               <strong>A spoiler-free zone.</strong>
-              <p>Comments unlock after you guess an accepted answer.</p>
+              <p>
+                Comments and the artist’s answers appear when this drawing is
+                solved.
+              </p>
             </div>
           </div>
         )}

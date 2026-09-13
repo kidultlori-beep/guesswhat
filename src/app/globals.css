@@ -352,6 +352,72 @@ input[type="color"]::-webkit-color-swatch {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.notification-wrap {
+  position: relative;
+}
+.notification-button {
+  position: relative;
+  padding: 7px;
+  border: 0;
+  background: none;
+}
+.notification-button > span {
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--red);
+  color: white;
+  font: bold 12px var(--body);
+  display: grid;
+  place-items: center;
+  padding: 0 5px;
+}
+.notification-menu {
+  position: absolute;
+  z-index: 30;
+  right: 0;
+  top: 48px;
+  width: min(390px, calc(100vw - 32px));
+  max-height: 480px;
+  overflow: auto;
+  padding: 18px;
+  box-shadow: 0 15px 45px #34343426;
+}
+.notification-menu h2 {
+  font-size: 27px;
+  margin-bottom: 12px;
+}
+.notification-menu > p {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 18px 5px;
+}
+.notification-menu a {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  color: var(--ink);
+  padding: 11px 5px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.notification-menu a.unread {
+  background: var(--blue-soft);
+}
+.notification-menu img {
+  width: 72px;
+  height: 52px;
+  object-fit: contain;
+  background: white;
+  border: 1px solid var(--border);
+}
+.notification-menu small {
+  display: block;
+  margin-top: 5px;
+}
 .page {
   max-width: 1450px;
   padding: 0 28px;
@@ -752,6 +818,39 @@ input[type="color"]::-webkit-color-swatch {
   background: none;
   padding: 0 3px;
   align-self: flex-start;
+}
+.solve-event {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 16px;
+  padding: 18px;
+  background: #eaf7ed;
+  border: 1px solid #b9dec3;
+  border-radius: 10px;
+  margin: 12px 0;
+}
+.solve-event img {
+  width: 130px;
+  aspect-ratio: 1.5;
+  object-fit: contain;
+  background: white;
+  border: 1px solid var(--border);
+}
+.solve-event strong {
+  font-family: var(--hand);
+  font-size: 23px;
+  color: var(--green);
+}
+.solve-event p {
+  font-size: 14px;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+.solve-event time {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 7px;
 }
 .share-fallback {
   margin: 14px 0;

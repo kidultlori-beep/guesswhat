@@ -10,7 +10,14 @@ import {
   normalize,
   MAX_ANSWER_LENGTH,
 } from "./answers";
-import type { User, StackDetail, StackSummary, Floor, RankRow } from "./types";
+import type {
+  User,
+  StackDetail,
+  StackSummary,
+  Floor,
+  RankRow,
+  Notification,
+} from "./types";
 
 export class GameError extends Error {
   constructor(
@@ -56,16 +63,57 @@ export class Game {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY, nickname TEXT NOT NULL, session_hash TEXT UNIQUE NOT NULL, expires INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS stacks(number INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE NOT NULL, word TEXT NOT NULL, creator_id TEXT NOT NULL REFERENCES users(id), created INTEGER NOT NULL, updated INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS floors(id TEXT PRIMARY KEY, stack_id TEXT NOT NULL REFERENCES stacks(id), author_id TEXT NOT NULL REFERENCES users(id), floor_index INTEGER NOT NULL, image BLOB NOT NULL, preview BLOB NOT NULL, created INTEGER NOT NULL, UNIQUE(stack_id, floor_index), UNIQUE(stack_id, author_id));
+      CREATE TABLE IF NOT EXISTS floors(id TEXT PRIMARY KEY, stack_id TEXT NOT NULL REFERENCES stacks(id), author_id TEXT NOT NULL REFERENCES users(id), floor_index INTEGER NOT NULL, image BLOB NOT NULL, preview BLOB NOT NULL, created INTEGER NOT NULL, answers TEXT, UNIQUE(stack_id, floor_index));
       CREATE TABLE IF NOT EXISTS guesses(id INTEGER PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), stack_id TEXT NOT NULL REFERENCES stacks(id), text TEXT NOT NULL, correct INTEGER NOT NULL, created INTEGER NOT NULL, UNIQUE(user_id,stack_id,text));
       CREATE UNIQUE INDEX IF NOT EXISTS one_solve ON guesses(user_id,stack_id) WHERE correct=1;
       CREATE TABLE IF NOT EXISTS meters(user_id TEXT NOT NULL REFERENCES users(id), stack_id TEXT NOT NULL REFERENCES stacks(id), remaining INTEGER NOT NULL, anchor INTEGER NOT NULL, PRIMARY KEY(user_id,stack_id));
       CREATE TABLE IF NOT EXISTS likes(user_id TEXT NOT NULL REFERENCES users(id), floor_id TEXT NOT NULL REFERENCES floors(id), created INTEGER NOT NULL, PRIMARY KEY(user_id,floor_id));
       CREATE TABLE IF NOT EXISTS comments(id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), floor_id TEXT NOT NULL REFERENCES floors(id), text TEXT NOT NULL, created INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS publications(user_id TEXT NOT NULL REFERENCES users(id), key TEXT NOT NULL, stack_id TEXT NOT NULL REFERENCES stacks(id), floor_id TEXT NOT NULL REFERENCES floors(id), PRIMARY KEY(user_id,key));
+      CREATE TABLE IF NOT EXISTS floor_guesses(id INTEGER PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), floor_id TEXT NOT NULL REFERENCES floors(id), text TEXT NOT NULL, correct INTEGER NOT NULL, created INTEGER NOT NULL, UNIQUE(user_id,floor_id,text));
+      CREATE UNIQUE INDEX IF NOT EXISTS one_floor_solve ON floor_guesses(user_id,floor_id) WHERE correct=1;
+      CREATE TABLE IF NOT EXISTS floor_meters(user_id TEXT NOT NULL REFERENCES users(id), floor_id TEXT NOT NULL REFERENCES floors(id), remaining INTEGER NOT NULL, anchor INTEGER NOT NULL, PRIMARY KEY(user_id,floor_id));
+      CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), actor_id TEXT NOT NULL REFERENCES users(id), floor_id TEXT NOT NULL REFERENCES floors(id), guess TEXT NOT NULL, created INTEGER NOT NULL, read INTEGER NOT NULL DEFAULT 0);
       CREATE INDEX IF NOT EXISTS floor_stack ON floors(stack_id,floor_index);
       CREATE INDEX IF NOT EXISTS comment_floor ON comments(floor_id,created);
+      CREATE INDEX IF NOT EXISTS notification_user ON notifications(user_id,read,created);
     `);
+    const floorColumns = this.db.prepare("PRAGMA table_info(floors)").all() as {
+      name: string;
+    }[];
+    if (!floorColumns.some((column) => column.name === "answers")) {
+      this.db.exec("ALTER TABLE floors ADD COLUMN answers TEXT");
+      this.db.exec(
+        "UPDATE floors SET answers=(SELECT word FROM stacks WHERE stacks.id=floors.stack_id) WHERE answers IS NULL",
+      );
+    }
+    const floorSchema = (
+      this.db
+        .prepare(
+          "SELECT sql FROM sqlite_master WHERE type='table' AND name='floors'",
+        )
+        .get() as { sql: string }
+    ).sql;
+    if (/UNIQUE\s*\(\s*stack_id\s*,\s*author_id\s*\)/i.test(floorSchema)) {
+      this.db.exec("PRAGMA foreign_keys=OFF");
+      this.db.exec(`BEGIN IMMEDIATE;
+        CREATE TABLE floors_new(id TEXT PRIMARY KEY,stack_id TEXT NOT NULL REFERENCES stacks(id),author_id TEXT NOT NULL REFERENCES users(id),floor_index INTEGER NOT NULL,image BLOB NOT NULL,preview BLOB NOT NULL,created INTEGER NOT NULL,answers TEXT,UNIQUE(stack_id,floor_index));
+        INSERT INTO floors_new(id,stack_id,author_id,floor_index,image,preview,created,answers) SELECT id,stack_id,author_id,floor_index,image,preview,created,answers FROM floors;
+        DROP TABLE floors; ALTER TABLE floors_new RENAME TO floors; COMMIT;`);
+      this.db.exec("PRAGMA foreign_keys=ON");
+    }
+    this.db.exec(
+      "CREATE INDEX IF NOT EXISTS floor_stack ON floors(stack_id,floor_index)",
+    );
+    const migrated = this.db
+      .prepare("SELECT 1 FROM floor_guesses LIMIT 1")
+      .get();
+    if (!migrated) {
+      this.db
+        .exec(`INSERT OR IGNORE INTO floor_guesses(user_id,floor_id,text,correct,created)
+        SELECT g.user_id,(SELECT id FROM floors f WHERE f.stack_id=g.stack_id ORDER BY f.floor_index DESC LIMIT 1),g.text,g.correct,g.created
+        FROM guesses g WHERE EXISTS(SELECT 1 FROM floors f WHERE f.stack_id=g.stack_id)`);
+    }
   }
   transaction<T>(action: () => T) {
     this.db.exec("BEGIN IMMEDIATE");
@@ -113,14 +161,14 @@ export class Game {
         .get(id) as StackRow) || fail(404, "Stack not found.")
     );
   }
-  solved(uid: string | undefined, id: string) {
+  solved(uid: string | undefined, floorId: string) {
     return (
       !!uid &&
       !!this.db
         .prepare(
-          "SELECT 1 FROM guesses WHERE user_id=? AND stack_id=? AND correct=1",
+          "SELECT 1 FROM floor_guesses WHERE user_id=? AND floor_id=? AND correct=1",
         )
-        .get(uid, id)
+        .get(uid, floorId)
     );
   }
   contributed(uid: string | undefined, id: string) {
@@ -131,14 +179,15 @@ export class Game {
         .get(uid, id)
     );
   }
-  meter(uid: string | undefined, id: string) {
+  meter(uid: string | undefined, floorId: string) {
     const now = this.now();
     const row = uid
       ? (this.db
           .prepare(
-            "SELECT remaining,anchor FROM meters WHERE user_id=? AND stack_id=?",
+            "SELECT remaining,anchor FROM floor_meters WHERE user_id=? AND floor_id=?",
           )
-          .get(uid, id) as { remaining: number; anchor: number } | undefined)
+          .get(uid, floorId) as
+          { remaining: number; anchor: number } | undefined)
       : undefined;
     if (!row) return { remaining: 5, anchor: now, resetAt: null };
     const ticks = Math.max(0, Math.floor((now - row.anchor) / 60000)),
@@ -165,23 +214,31 @@ export class Game {
     >[];
     return rows.map((r) => ({
       ...r,
-      solved: this.solved(uid, r.id),
-      contributed: this.contributed(uid, r.id),
+      solved: this.solved(uid, r.latest),
+      contributed: !!uid && this.floor(r.latest).author_id === uid,
     }));
   }
   detail(id: string, uid?: string): StackDetail {
     const s = this.stack(id),
-      solved = this.solved(uid, id),
+      target = this.db
+        .prepare(
+          "SELECT id,author_id,answers FROM floors WHERE stack_id=? ORDER BY floor_index DESC LIMIT 1",
+        )
+        .get(id) as { id: string; author_id: string; answers: string },
+      solved = this.solved(uid, target.id),
       contributed = this.contributed(uid, id);
     const floors = this.db
       .prepare(
         `SELECT f.id,f.floor_index AS 'index',f.author_id authorId,u.nickname author,f.created,
       (SELECT COUNT(*) FROM likes WHERE floor_id=f.id) likes,
       EXISTS(SELECT 1 FROM likes WHERE floor_id=f.id AND user_id=?) liked,
-      (SELECT COUNT(*) FROM comments WHERE floor_id=f.id) comments
+      (SELECT COUNT(*) FROM comments WHERE floor_id=f.id)+(SELECT COUNT(*) FROM floor_guesses WHERE floor_id=f.id AND correct=1) comments,
+      CASE WHEN f.author_id=? OR EXISTS(SELECT 1 FROM floor_guesses WHERE floor_id=f.id AND correct=1) THEN f.answers ELSE NULL END answers,
+      EXISTS(SELECT 1 FROM floor_guesses WHERE floor_id=f.id AND correct=1) revealed,
+      (SELECT COUNT(*) FROM floor_guesses WHERE floor_id=f.id AND correct=1) solves
       FROM floors f JOIN users u ON u.id=f.author_id WHERE f.stack_id=? ORDER BY f.floor_index`,
       )
-      .all(uid ?? "", id) as unknown as Floor[];
+      .all(uid ?? "", uid ?? "", id) as unknown as Floor[];
     const creator = (
       this.db
         .prepare("SELECT nickname FROM users WHERE id=?")
@@ -190,25 +247,37 @@ export class Game {
     const guesses = uid
       ? (this.db
           .prepare(
-            "SELECT text,correct FROM guesses WHERE stack_id=? AND user_id=? ORDER BY id DESC LIMIT 50",
+            "SELECT text,correct FROM floor_guesses WHERE floor_id=? AND user_id=? ORDER BY id DESC LIMIT 50",
           )
-          .all(id, uid) as unknown as { text: string; correct: boolean }[])
+          .all(target.id, uid) as unknown as {
+          text: string;
+          correct: boolean;
+        }[])
       : [];
-    const meter = this.meter(uid, id);
+    const meter = this.meter(uid, target.id);
+    const revealed = !!this.db
+      .prepare("SELECT 1 FROM floor_guesses WHERE floor_id=? AND correct=1")
+      .get(target.id);
     return {
       id: s.id,
       number: s.number,
       creator,
       creatorId: s.creator_id,
-      floors: floors.map((f) => ({ ...f, liked: !!f.liked })),
-      word: solved || uid === s.creator_id ? s.word : null,
+      floors: floors.map((f) => ({
+        ...f,
+        liked: !!f.liked,
+        revealed: !!f.revealed,
+      })),
+      word:
+        solved || uid === target.author_id || revealed ? target.answers : null,
       solved,
       contributed,
-      canDraw: solved && !contributed && floors.length < 50,
+      canDraw: solved && floors.length < 50,
       remaining: meter.remaining,
       resetAt: meter.resetAt,
       now: this.now(),
       guesses: guesses.map((g) => ({ ...g, correct: !!g.correct })),
+      targetFloorId: target.id,
     };
   }
   image(data: unknown) {
@@ -276,10 +345,8 @@ export class Game {
         index = 1;
       if (id) {
         this.stack(id);
-        if (!this.solved(uid, id))
-          fail(403, "Solve this stack before drawing the next floor.");
-        if (this.contributed(uid, id))
-          fail(409, "You already contributed to this stack.");
+        if (typeof input.parent !== "string" || !this.solved(uid, input.parent))
+          fail(403, "Solve the latest drawing before adding the next floor.");
         const latest = this.db
           .prepare(
             "SELECT id,floor_index FROM floors WHERE stack_id=? ORDER BY floor_index DESC LIMIT 1",
@@ -293,13 +360,14 @@ export class Game {
             "A new floor arrived. Review it before publishing your saved drawing.",
           );
         index = latest.floor_index + 1;
-      } else {
-        let answers: string;
-        try {
-          answers = parseAnswers(input.word).join(",");
-        } catch (error) {
-          return fail(400, (error as Error).message);
-        }
+      }
+      let answers: string;
+      try {
+        answers = parseAnswers(input.word).join(",");
+      } catch (error) {
+        return fail(400, (error as Error).message);
+      }
+      if (!id) {
         id = randomUUID();
         this.db
           .prepare(
@@ -309,8 +377,19 @@ export class Game {
       }
       const floor = randomUUID();
       this.db
-        .prepare("INSERT INTO floors VALUES(?,?,?,?,?,?,?)")
-        .run(floor, id, uid, index, pixels.image, pixels.preview, this.now());
+        .prepare(
+          "INSERT INTO floors(id,stack_id,author_id,floor_index,image,preview,created,answers) VALUES(?,?,?,?,?,?,?,?)",
+        )
+        .run(
+          floor,
+          id,
+          uid,
+          index,
+          pixels.image,
+          pixels.preview,
+          this.now(),
+          answers,
+        );
       this.db
         .prepare("UPDATE stacks SET updated=? WHERE id=?")
         .run(this.now(), id);
@@ -323,33 +402,59 @@ export class Game {
   guess(uid: string, id: string, raw: unknown) {
     const guess = normalize(text(raw, 1, MAX_ANSWER_LENGTH));
     return this.transaction(() => {
-      const s = this.stack(id);
-      if (s.creator_id === uid)
-        fail(403, "You created this stack. Let someone else guess!");
-      if (this.solved(uid, id)) return { correct: true, duplicate: true };
+      this.stack(id);
+      const target = this.db
+        .prepare(
+          "SELECT id,author_id,answers FROM floors WHERE stack_id=? ORDER BY floor_index DESC LIMIT 1",
+        )
+        .get(id) as { id: string; author_id: string; answers: string };
+      if (target.author_id === uid)
+        fail(403, "You drew this floor. Let someone else guess!");
+      if (this.solved(uid, target.id))
+        return { correct: true, duplicate: true };
+      if (
+        this.db
+          .prepare("SELECT 1 FROM floor_guesses WHERE floor_id=? AND correct=1")
+          .get(target.id)
+      )
+        fail(
+          409,
+          "Someone already solved this floor. The next drawing is on its way!",
+        );
       if (
         this.db
           .prepare(
-            "SELECT 1 FROM guesses WHERE user_id=? AND stack_id=? AND text=?",
+            "SELECT 1 FROM floor_guesses WHERE user_id=? AND floor_id=? AND text=?",
           )
-          .get(uid, id, guess)
+          .get(uid, target.id, guess)
       )
         return { correct: false, duplicate: true };
-      const meter = this.meter(uid, id);
+      const meter = this.meter(uid, target.id);
       if (meter.remaining < 1)
         fail(429, "No tries left yet. Wait for the next refill.");
-      const correct = matchesAnswer(guess, s.word);
+      const correct = matchesAnswer(guess, target.answers);
       this.db
         .prepare(
-          "INSERT INTO guesses(user_id,stack_id,text,correct,created) VALUES(?,?,?,?,?)",
+          "INSERT INTO floor_guesses(user_id,floor_id,text,correct,created) VALUES(?,?,?,?,?)",
         )
-        .run(uid, id, guess, Number(correct), this.now());
+        .run(uid, target.id, guess, Number(correct), this.now());
       if (!correct)
         this.db
           .prepare(
-            "INSERT INTO meters VALUES(?,?,?,?) ON CONFLICT(user_id,stack_id) DO UPDATE SET remaining=excluded.remaining,anchor=excluded.anchor",
+            "INSERT INTO floor_meters VALUES(?,?,?,?) ON CONFLICT(user_id,floor_id) DO UPDATE SET remaining=excluded.remaining,anchor=excluded.anchor",
           )
-          .run(uid, id, meter.remaining - 1, meter.anchor);
+          .run(uid, target.id, meter.remaining - 1, meter.anchor);
+      if (correct)
+        this.db
+          .prepare("INSERT INTO notifications VALUES(?,?,?,?,?,?,0)")
+          .run(
+            randomUUID(),
+            target.author_id,
+            uid,
+            target.id,
+            guess,
+            this.now(),
+          );
       return { correct, duplicate: false };
     });
   }
@@ -374,22 +479,33 @@ export class Game {
         .run(uid, id);
   }
   canComment(uid: string | undefined, floor: string) {
-    const f = this.floor(floor),
-      s = this.stack(f.stack_id);
-    return !!uid && (uid === s.creator_id || this.solved(uid, s.id));
+    const f = this.floor(floor);
+    return (
+      !!uid &&
+      (uid === f.author_id ||
+        this.solved(uid, floor) ||
+        !!this.db
+          .prepare("SELECT 1 FROM floor_guesses WHERE floor_id=? AND correct=1")
+          .get(floor))
+    );
   }
   comments(uid: string | undefined, floor: string) {
-    if (!this.canComment(uid, floor))
-      fail(403, "Comments unlock after you solve this stack.");
+    const revealed = !!this.db
+      .prepare("SELECT 1 FROM floor_guesses WHERE floor_id=? AND correct=1")
+      .get(floor);
+    if (!revealed && !this.canComment(uid, floor))
+      fail(403, "Comments unlock when this drawing is solved.");
     return this.db
       .prepare(
-        "SELECT c.id,c.user_id authorId,u.nickname author,c.text,c.created FROM comments c JOIN users u ON u.id=c.user_id WHERE c.floor_id=? ORDER BY c.created,c.id LIMIT 200",
+        `SELECT c.id,c.user_id authorId,u.nickname author,c.text,c.created,'comment' kind,NULL guess,NULL answers FROM comments c JOIN users u ON u.id=c.user_id WHERE c.floor_id=?
+         UNION ALL SELECT 'solve-'||g.id,g.user_id,u.nickname,NULL,g.created,'solve',g.text,f.answers FROM floor_guesses g JOIN users u ON u.id=g.user_id JOIN floors f ON f.id=g.floor_id WHERE g.floor_id=? AND g.correct=1
+         ORDER BY 5,1 LIMIT 200`,
       )
-      .all(floor);
+      .all(floor, floor);
   }
   comment(uid: string, floor: string, raw: unknown) {
     if (!this.canComment(uid, floor))
-      fail(403, "Solve the stack before commenting.");
+      fail(403, "Wait until this drawing is solved before commenting.");
     const content = text(raw, 1, 300);
     const recent = this.db
       .prepare("SELECT COUNT(*) n FROM comments WHERE user_id=? AND created>?")
@@ -421,7 +537,7 @@ export class Game {
     else if (tab === "guessers")
       rows = this.db
         .prepare(
-          "SELECT u.id,u.nickname name,COUNT(g.id) score FROM users u JOIN guesses g ON g.user_id=u.id AND g.correct=1 GROUP BY u.id ORDER BY score DESC,MAX(g.created),u.id",
+          "SELECT u.id,u.nickname name,COUNT(g.id) score FROM users u JOIN floor_guesses g ON g.user_id=u.id AND g.correct=1 GROUP BY u.id ORDER BY score DESC,MAX(g.created),u.id",
         )
         .all() as typeof rows;
     else if (tab === "artists")
@@ -443,5 +559,16 @@ export class Game {
         "SELECT f.id,f.stack_id stackId,f.floor_index AS floor,s.number,(SELECT COUNT(*) FROM likes WHERE floor_id=f.id) likes FROM floors f JOIN stacks s ON s.id=f.stack_id WHERE f.author_id=? ORDER BY f.created DESC LIMIT 100",
       )
       .all(uid);
+  }
+  notifications(uid: string) {
+    const rows = this.db
+      .prepare(
+        `SELECT n.id,u.nickname actor,n.floor_id floorId,f.stack_id stackId,s.number stackNumber,f.floor_index floor,n.guess,n.created,n.read FROM notifications n JOIN users u ON u.id=n.actor_id JOIN floors f ON f.id=n.floor_id JOIN stacks s ON s.id=f.stack_id WHERE n.user_id=? ORDER BY n.created DESC LIMIT 50`,
+      )
+      .all(uid) as unknown as (Omit<Notification, "read"> & { read: number })[];
+    return rows.map((row) => ({ ...row, read: !!row.read }));
+  }
+  readNotifications(uid: string) {
+    this.db.prepare("UPDATE notifications SET read=1 WHERE user_id=?").run(uid);
   }
 }

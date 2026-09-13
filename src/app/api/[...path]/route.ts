@@ -100,6 +100,8 @@ async function handle(req: NextRequest) {
         );
       if (p[0] === "users" && p[2] === "contributions")
         return json({ floors: game.contributions(p[1]) });
+      if (p[0] === "notifications")
+        return json({ notifications: user ? game.notifications(user.id) : [] });
       throw new GameError(404, "Endpoint not found.");
     }
     if (!user) throw new GameError(401, "Choose a nickname to join in.");
@@ -116,6 +118,10 @@ async function handle(req: NextRequest) {
       if (typeof body.liked !== "boolean")
         throw new GameError(400, "Choose a like state.");
       game.like(user.id, p[1], body.liked);
+      return json({ ok: true });
+    }
+    if (method === "PUT" && p[0] === "notifications") {
+      game.readNotifications(user.id);
       return json({ ok: true });
     }
     if (method === "POST" && p[0] === "floors" && p[2] === "comments")

@@ -26,12 +26,12 @@ The server listens on all local interfaces. For friends on the same trusted Wi-F
 
 1. Click **Start a stack**, choose a nickname, and enter your own **Accepted answers**. Separate alternative words or phrases with English commas, for example `ELON MUSK,马斯克`. Click **Save answers & draw**, then draw and publish Floor 1. There is no word bank.
 2. Share its link with another browser profile, private window, device, or coworker. A second tab in the same browser normally shares the same player cookie.
-3. That player enters **one** word or phrase. Matching **any** listed answer wins: both `elon musk` and `马斯克` match the example above. English capitalization, surrounding/repeated whitespace and canonical Unicode spelling are normalized; partial matches and automatic synonyms are not accepted. Wrong answers consume one of five tries; one returns every minute. Correct guesses unlock the answer list, comments, and next-floor editor.
-4. Publish an independent drawing of the same subject. The original answer list remains unchanged through the relay. Each player contributes at most one floor per stack. Stacks finish at 50 floors.
+3. That player enters **one** word or phrase. Matching **any** answer set by the current floor's artist wins: both `elon musk` and `马斯克` match the example above. English capitalization, surrounding/repeated whitespace and canonical Unicode spelling are normalized; partial matches and automatic synonyms are not accepted. Wrong answers consume one of five tries; one returns every minute.
+4. The first correct guess reveals that floor's drawing, winning guess and full accepted-answer list in an automatic activity card. The artist receives an in-app notification. The winner must set a **new private answer list** before drawing the next floor. Artists may return later in an A → B → C → A relay; stacks finish at 50 floors.
 
 Enter 1–10 distinct accepted answers, each up to 80 characters (809 total input characters). Any language is supported for player-entered content; all interface labels, help and errors remain English. Empty comma-separated entries and full-width commas are rejected with guidance. Duplicate answers are combined. Unfinished answer edits are saved with the draft. Existing single-answer stacks and drafts remain readable without resetting the database; the former hard-coded synonyms no longer apply.
 
-Likes attach to the selected drawing's artist, not the stack founder. Comments unlock only after solving (or for the creator) to reduce spoilers. Rankings count floors, distinct solved stacks, and current drawing likes.
+Likes attach to the selected drawing's artist, not the stack founder. Comments unlock when that drawing is solved (and remain privately available to its artist beforehand). Rankings count floors, correct floor solves, and current drawing likes. Home, open stacks, activity cards and the notification bell poll for new activity while the page is visible.
 
 ## Drawing tools
 
@@ -74,7 +74,7 @@ Unit tests use memory or a temporary isolated database. HTTP tests start a separ
 
 ## Scope and limits
 
-This release is for trusted friends/LAN play. Anonymous cookies are **not** a public anti-cheat account system: people can create additional identities. No moderation, account recovery, drawing recognition, content reporting, distributed database, real-time push, or public deployment is included. Drawings can contain written hints; the app does not automatically police them. Refresh stacks/rankings to see new activity. SQLite and synchronous PNG processing suit small groups, not unmeasured public traffic.
+This release is for trusted friends/LAN play. Anonymous cookies are **not** a public anti-cheat account system: people can create additional identities. No moderation, account recovery, drawing recognition, content reporting, distributed database, WebSocket push, or public deployment is included. Drawings can contain written hints; the app does not automatically police them. Activity uses short polling (3–5 seconds), so it is near-real-time rather than instant push. If a winning player never publishes the next drawing, v1 has no timeout or reassignment. SQLite and synchronous PNG processing suit small groups, not unmeasured public traffic.
 
 The supported framework versions are locked in `package-lock.json`. They intentionally supersede the old Next.js 14 / Excalidraw assumptions: current Next.js is used, with a custom raster Canvas for true pixel erasing and fill. Node's built-in SQLite API is documented at [nodejs.org](https://nodejs.org/api/sqlite.html).
 
