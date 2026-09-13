@@ -33,6 +33,8 @@ Enter 1–10 distinct accepted answers, each up to 80 characters (809 total inpu
 
 Likes attach to the selected drawing's artist, not the stack founder. Comments unlock when that drawing is solved (and remain privately available to its artist beforehand). Rankings count floors, correct floor solves, and current drawing likes. Home, open stacks, activity cards and the notification bell poll for new activity while the page is visible.
 
+Each floor has a normal Share action plus **Share on X**. Shared pages advertise a spoiler-free 1200 × 630 card containing the drawing, stack/floor number and artist—but never answers or guesses. X card crawlers need a publicly reachable HTTPS URL; `localhost` and private LAN addresses cannot produce public previews. On hosted installations set `DRAWSTACKS_PUBLIC_URL=https://your-domain.example` so canonical links and card URLs always use the public origin.
+
 ## Drawing tools
 
 Pencil and marker with separate remembered width/opacity, 10 colors and custom HEX, pixel eraser, connected fill with tolerance, line/rectangle/ellipse, rectangular select/move/delete, 50-step undo/redo, confirmed clear, zoom 25–200%, fit and pan. Hold Shift to constrain shapes; Space-drag pans. Keyboard: B/M/E/G/V/H, [ / ], Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z.
@@ -69,12 +71,14 @@ Unit tests use memory or a temporary isolated database. HTTP tests start a separ
 - `src/components/GameApp.tsx`: home, identity, stack/guess/social flows and rankings.
 - `src/components/DrawingEditor.tsx`: interactive Canvas editor and local draft lifecycle.
 - `src/lib/paint.ts`: connected raster fill algorithm.
+- `src/lib/share.ts`: selected-floor URLs, share copy and platform intent builders.
+- `src/app/api/share-card/[floorId]/route.tsx`: spoiler-free social preview image renderer.
 - `src/app/globals.css`: self-hosted Patrick Hand/Nunito typography, cream theme and responsive layouts.
 - [Architecture and handoff](docs/implementation-v1.md)
 
 ## Scope and limits
 
-This release is for trusted friends/LAN play. Anonymous cookies are **not** a public anti-cheat account system: people can create additional identities. No moderation, account recovery, drawing recognition, content reporting, distributed database, WebSocket push, or public deployment is included. Drawings can contain written hints; the app does not automatically police them. Activity uses short polling (3–5 seconds), so it is near-real-time rather than instant push. If a winning player never publishes the next drawing, v1 has no timeout or reassignment. SQLite and synchronous PNG processing suit small groups, not unmeasured public traffic.
+This release is for trusted friends/LAN play. Anonymous cookies are **not** a public anti-cheat account system: people can create additional identities. No moderation, account recovery, drawing recognition, content reporting, distributed database, WebSocket push, or public deployment is included. Drawings can contain written hints; the app does not automatically police them. Activity uses short polling (3–5 seconds), so it is near-real-time rather than instant push. X sharing opens a user-confirmed composer; DrawStacks does not silently publish to social accounts. If a winning player never publishes the next drawing, v1 has no timeout or reassignment. SQLite and synchronous PNG processing suit small groups, not unmeasured public traffic.
 
 The supported framework versions are locked in `package-lock.json`. They intentionally supersede the old Next.js 14 / Excalidraw assumptions: current Next.js is used, with a custom raster Canvas for true pixel erasing and fill. Node's built-in SQLite API is documented at [nodejs.org](https://nodejs.org/api/sqlite.html).
 

@@ -22,6 +22,7 @@ import {
   Buildings,
   Lightbulb,
   Bell,
+  XLogo,
 } from "@phosphor-icons/react";
 import type {
   User,
@@ -33,6 +34,7 @@ import type {
 } from "@/lib/types";
 import { api, imageUrl, stackName, errorMessage } from "@/lib/client";
 import { MAX_ANSWER_LENGTH } from "@/lib/answers";
+import { floorSharePath, floorShareText, xShareUrl } from "@/lib/share";
 import DrawingEditor from "./DrawingEditor";
 
 type RequireUser = (action: () => void) => void;
@@ -940,7 +942,7 @@ function Social({
     }
   }
   async function share() {
-    const url = `${window.location.origin}/stacks/${data.id}?floor=${floor.id}`;
+    const url = `${window.location.origin}${floorSharePath(data.id, floor.id)}`;
     setMessage("");
     try {
       if (navigator.share) {
@@ -957,6 +959,14 @@ function Social({
       if (!(e instanceof DOMException && e.name === "AbortError"))
         setShareUrl(url);
     }
+  }
+  function shareOnX() {
+    const url = `${window.location.origin}${floorSharePath(data.id, floor.id)}`;
+    window.open(
+      xShareUrl(url, floorShareText(data.number, floor.index)),
+      "_blank",
+      "noopener,noreferrer",
+    );
   }
   return (
     <div className="social">
@@ -978,6 +988,9 @@ function Social({
         </a>
         <button onClick={share}>
           <ShareNetwork /> Share
+        </button>
+        <button onClick={shareOnX} aria-label="Share this floor on X">
+          <XLogo weight="bold" /> Share on X
         </button>
         <span role="status">{message}</span>
       </div>

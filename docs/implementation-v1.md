@@ -34,6 +34,7 @@ Mutations need `X-DrawStacks: 1`; browser Origin must match Host. The session co
 | POST | `/api/stacks/:id/guess` | Correct/duplicate flags plus fresh requester-specific state |
 | POST | `/api/stacks/:id/draw` | Winner publishes relay with `parent`, new `word` answers, `image`, `key` |
 | GET | `/api/floors/:id/image?preview=1` | Immutable PNG thumbnail; omit query for original |
+| GET | `/api/share-card/:floorId` | Public spoiler-free 1200 × 630 social preview PNG |
 | PUT | `/api/floors/:id/like` | Set explicit boolean `liked`, safe to retry |
 | GET / POST | `/api/floors/:id/comments` | Read/post authorized plain-text comments |
 | DELETE | `/api/comments/:id` | Owner-only deletion |
@@ -52,6 +53,12 @@ Guesses must match one complete normalized entry; do not split a submitted guess
 The startup migration adds per-floor answers, guesses, attempt meters and notifications, copies each legacy stack answer to its existing floors, and removes the former unique artist/stack restriction. Legacy solve/attempt tables remain for compatibility and are migrated without deleting player data. This permits A → B → C → A relays while keeping unique floor order and stale-parent checks.
 
 Drafts retain the compatible `word` field and add `answerInput` for unfinished edits; older drafts without the extra field still restore. All interface copy remains English, including validation; user-entered answers can use other languages. Never include private answer lists in public titles, previews, lists, rankings or share text.
+
+### Social sharing
+
+Selected-floor pages emit Open Graph and X `summary_large_image` metadata. The dynamic card contains only public floor art, stack/floor numbers, artist nickname and neutral invitation copy; its renderer must never query guesses or answers. `src/lib/share.ts` owns canonical floor paths and platform intent encoding. The X action opens `https://x.com/intent/tweet` in a new browsing context, so the player reviews and submits the post on X; no X token is collected.
+
+Use `DRAWSTACKS_PUBLIC_URL` in hosted/proxied environments. Without it, metadata derives the request origin. Social crawlers cannot reach localhost or private LAN origins. Future platform buttons should be adapters around the same canonical URL and metadata, with the native Web Share API remaining the device-level fallback. OAuth posting APIs are a separate, explicit-consent feature and must not reuse the anonymous game cookie as social authorization.
 
 ## Draft and canvas behavior
 

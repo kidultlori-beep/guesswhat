@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Game, GameError } from "../src/lib/game";
 import { PNG } from "pngjs";
 import { parseAnswers, matchesAnswer } from "../src/lib/answers";
+import { floorSharePath, floorShareText, xShareUrl } from "../src/lib/share";
 import { floodFill } from "../src/lib/paint";
 import { mkdtempSync, existsSync, unlinkSync, rmdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -84,6 +85,21 @@ test("exact phrase matching accepts either language, not partials or comma-separ
   assert.equal(matchesAnswer("bike", "bicycle"), false);
   assert.equal(matchesAnswer(" CAT ", "cat"), true);
   assert.equal(matchesAnswer("CAFÉ", "Cafe\u0301"), true);
+});
+
+test("share links preserve the selected floor and build an encoded X intent", () => {
+  const path = floorSharePath("stack / 1", "floor ? 2");
+  assert.equal(path, "/stacks/stack%20%2F%201?floor=floor%20%3F%202");
+  const text = floorShareText(7, 3);
+  assert.equal(
+    text,
+    "Can you guess Floor 3 in Stack #007? Draw the next floor on DrawStacks!",
+  );
+  const intent = new URL(xShareUrl(`https://draw.example${path}`, text));
+  assert.equal(intent.origin, "https://x.com");
+  assert.equal(intent.pathname, "/intent/tweet");
+  assert.equal(intent.searchParams.get("text"), text);
+  assert.equal(intent.searchParams.get("url"), `https://draw.example${path}`);
 });
 test("a correct answer reveals that floor, creates a public event and notifies its artist", (t) => {
   const { game, a, b, c } = setup(t);

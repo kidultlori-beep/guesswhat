@@ -211,6 +211,9 @@ test("two players create, guess, relay, socialize, share and rank; real desktop/
   await guest.grantPermissions(["clipboard-read", "clipboard-write"]);
   await player.getByRole("button", { name: "Share", exact: true }).click();
   await expect(player.getByText("Link copied!")).toBeVisible();
+  await expect(
+    player.getByRole("button", { name: "Share this floor on X" }),
+  ).toBeVisible();
   expect(await player.evaluate(() => navigator.clipboard.readText())).toContain(
     `floor=${floor}`,
   );

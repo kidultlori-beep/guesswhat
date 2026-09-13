@@ -110,6 +110,28 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   assert.equal(img.status, 200);
   assert.equal(img.headers.get("content-type"), "image/png");
   assert.equal(PNG.sync.read(Buffer.from(await img.arrayBuffer())).width, 960);
+  let shareCard: Response;
+  try {
+    shareCard = await call(`share-card/${s.floor}`);
+  } catch (error) {
+    throw new Error(
+      `Share-card request failed: ${error}\nServer output:\n${output}`,
+    );
+  }
+  if (shareCard.status !== 200)
+    throw new Error(
+      `Share card returned ${shareCard.status}: ${await shareCard.text()}\nServer output:\n${output}`,
+    );
+  assert.match(shareCard.headers.get("content-type") || "", /^image\/png/);
+  const card = PNG.sync.read(Buffer.from(await shareCard.arrayBuffer()));
+  assert.equal(card.width, 1200);
+  assert.equal(card.height, 630);
+  const sharedPage = await fetch(
+    `${root}/stacks/${s.id}?floor=${encodeURIComponent(s.floor)}`,
+  );
+  const sharedHtml = await sharedPage.text();
+  assert.match(sharedHtml, /summary_large_image/);
+  assert.ok(sharedHtml.includes(`/api/share-card/${s.floor}`));
   assert.equal(
     (await call(`floors/${s.floor}/comments`, "GET", undefined, b.cookie))
       .status,

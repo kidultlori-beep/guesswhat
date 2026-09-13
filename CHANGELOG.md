@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-13 — X sharing and spoiler-free social cards
+
+- Added a dedicated **Share on X** action using X's user-confirmed Web Intent. The selected floor URL and English invitation are prefilled; DrawStacks never posts on a player's behalf or needs X credentials for this flow.
+- Added a dynamic 1200 × 630 DrawStacks share card for every floor: cream paper, blue/yellow brand accents, the real drawing, stack/floor identity, artist attribution and a guessing call to action. Secret answers and private guesses are never rendered into the card.
+- Added per-floor Open Graph and `summary_large_image` metadata so X and other compatible social crawlers can display the card. Added `DRAWSTACKS_PUBLIC_URL` support for a stable public origin behind a proxy or custom domain.
+- Centralized selected-floor paths, English share copy and encoded X Intent construction in `src/lib/share.ts`, leaving a small adapter boundary for later Telegram, WhatsApp, Facebook and native device sharing.
+- Verification: share URL unit coverage, TypeScript, formatting, production build and HTTP tests cover 1200 × 630 PNG rendering plus page metadata. Browser interaction remains pending because the connected browser provider is unavailable.
+- Handoff: social cards require a publicly reachable HTTPS deployment; localhost/LAN URLs cannot be fetched by X. Before adding each network, recheck its current official share-dialog requirements. Instagram-style direct posting needs a separately authorized platform/API flow or native share-sheet handoff.
+- Synchronization status: the GitHub connection is still timing out on port 443, so this iteration and the preceding local commit await a normal, non-forced push. The failure occurred before any remote write; retry after connectivity returns and verify remote `main` afterward.
+
 ## 2026-09-13 — Per-floor answers, solve reveals and live activity
 
 - Changed the relay contract so every artist privately defines 1–10 accepted answers for their own floor. The first correct solver must set a new answer list before drawing the next floor; answers never carry forward automatically. Artists may return later in an A → B → C → A relay.
