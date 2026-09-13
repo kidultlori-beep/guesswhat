@@ -1973,6 +1973,29 @@ input[type="color"]::-webkit-color-swatch {
     flex-wrap: wrap;
   }
 }
+.answer-form {
+  text-align: left;
+}
+.answer-form label {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.answer-form small {
+  display: block;
+  margin: 10px 0 18px;
+  line-height: 1.7;
+}
+.answer-form button {
+  margin: 0 12px 8px 0;
+}
+.secret strong,
+.revealed-word {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.secret {
+  max-width: 100%;
+}
 .reference-floor {
   max-width: 550px;
   margin: 0 auto 20px;

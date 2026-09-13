@@ -7,7 +7,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "DrawStacks — Draw. Guess. Build together.",
   description:
-    "One secret word. A new drawing on every floor. A collaborative drawing and guessing game.",
+    "One subject. A new drawing on every floor. A collaborative drawing and guessing game.",
 };
 export default function RootLayout({
   children,

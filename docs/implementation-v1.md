@@ -11,7 +11,7 @@ No sample stacks are inserted on normal startup. All test state is isolated. Sel
 | Table | Responsibility / constraints |
 | --- | --- |
 | users | Public UUID, nickname, hashed private session token, expiration |
-| stacks | Neutral sequential public number, opaque UUID, private word, founder, times |
+| stacks | Neutral sequential public number, opaque UUID, private comma-separated accepted answers in legacy `word` column, founder, times |
 | floors | Validated original/preview PNGs, author, stack, ordered index; unique author/stack and index/stack |
 | guesses | Private normalized guesses; unique player/stack/text, partial unique first correct solve |
 | meters | Remaining attempts and server-time recovery anchor per player/stack |
@@ -28,7 +28,6 @@ Mutations need `X-DrawStacks: 1`; browser Origin must match Host. The session co
 | Method | Route | Result |
 | --- | --- | --- |
 | GET / PUT | `/api/me` | Current identity / choose or update nickname |
-| GET | `/api/words` | Six suggestions from the 80-word bank, not a stack's chosen word |
 | GET / POST | `/api/stacks` | Twelve public stack summaries (offset pagination) / publish a new stack |
 | GET | `/api/stacks/:id` | Public floors and only the requesting player's private solve/attempt state |
 | POST | `/api/stacks/:id/guess` | Correct/duplicate flags plus fresh requester-specific state |
@@ -42,11 +41,19 @@ Mutations need `X-DrawStacks: 1`; browser Origin must match Host. The session co
 
 Client errors use `{error: "readable message"}`. Expected statuses: 400 invalid content, 401 missing session, 403 denied, 404 missing, 409 publication conflict, 413 oversized body, 429 wait/refill or comment throttling. Do not replace this with client-only authorization.
 
+### Custom accepted answers (supersedes the word bank)
+
+`POST /api/stacks` retains the compatible `word` field but now accepts user-written English-comma-separated answers, e.g. `ELON MUSK,马斯克`. `src/lib/answers.ts` shares validation between browser and server: 1–10 distinct entries, 80 characters per entry, 809 input characters total; trim/collapse whitespace, NFC normalization and case-insensitive deduplication while preserving first-entry spelling. Empty entries, full-width comma separators and control characters are rejected with English messages. `/api/words` is removed (404); there are no built-in aliases or suggestions.
+
+Guesses must match one complete normalized entry; do not split a submitted guess into multiple guesses or accept substrings. Server response `word` is still null for unsolved viewers, and otherwise contains the canonical comma-separated list. Relay bodies cannot overwrite answers. No schema migration or player-data rewrite is needed: legacy single-word values naturally form a one-entry list. Already recorded solves remain valid, but implicit old word-bank synonyms no longer grant new solves.
+
+Drafts retain the compatible `word` field and add `answerInput` for unfinished edits; older drafts without the extra field still restore. All interface copy remains English, including validation; user-entered answers can use other languages. Never include private answer lists in public titles, previews, lists, rankings or share text.
+
 ## Draft and canvas behavior
 
 The visible canvas is always backed by a 960 × 640 transparent bitmap on a white sheet. Erasing uses `destination-out`, not white paint. Flood fill respects connected premultiplied pixel colors and tolerance. Selection copies raster pixels, clears the old region and moves the selected rectangle. Geometry/zoom do not change export resolution.
 
-Undo stores up to 51 compressed snapshots (initial state plus 50 actions); history is intentionally session-local. Draft JSON stores the current PNG, private word, publication key, expected parent. Keys are separated by user and stack. Completed strokes and setting the word save immediately. Failed storage is displayed and `Save & exit` is blocked; users should not navigate away when warned.
+Undo stores up to 51 compressed snapshots (initial state plus 50 actions); history is intentionally session-local. Draft JSON stores the current PNG, private accepted answers and unfinished answer input, publication key, expected parent. Keys are separated by user and stack. Completed strokes and answer edits save immediately. Failed storage is displayed and `Save & exit` is blocked; users should not navigate away when warned.
 
 Pencil defaults to 8 px/100%; marker to 16 px/45%. Each remembers its own width/opacity during an editor session. Color is shared. Eraser has a separate 4–80 px width. Brush/marker settings are not restored across page reloads. The fixed canvas supports mouse, stylus and touch pointers; there is no pressure-sensitive pen model in v1.
 

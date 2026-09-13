@@ -25,6 +25,7 @@ import {
   ShareNetwork,
 } from "@phosphor-icons/react";
 import { floodFill } from "@/lib/paint";
+import { parseAnswers, MAX_ANSWERS_INPUT_LENGTH } from "@/lib/answers";
 import { api, draftKey, freshKey, errorMessage, imageUrl } from "@/lib/client";
 import type { StackDetail, User } from "@/lib/types";
 
@@ -40,7 +41,13 @@ type Tool =
   | "pan";
 type Point = { x: number; y: number };
 type Rect = Point & { w: number; h: number };
-type Draft = { image: string; word: string; key: string; parent?: string };
+type Draft = {
+  image: string;
+  word: string;
+  answerInput?: string;
+  key: string;
+  parent?: string;
+};
 const tools = [
   ["pencil", "Pencil", PencilSimple],
   ["marker", "Marker", Highlighter],
@@ -93,7 +100,8 @@ export default function DrawingEditor({
     historyIndex = useRef(0),
     restoring = useRef(false);
   const [word, setWord] = useState(stack?.word || ""),
-    [suggestions, setSuggestions] = useState<string[]>([]),
+    [answerInput, setAnswerInput] = useState(stack?.word || ""),
+    [answerError, setAnswerError] = useState(""),
     [choosing, setChoosing] = useState(!stack?.word);
   const [reference, setReference] = useState(stack?.floors.at(-1)),
     [showReference, setShowReference] = useState(false);
@@ -111,6 +119,7 @@ export default function DrawingEditor({
     parent = useRef(stack?.floors.at(-1)?.id),
     storageKey = draftKey(user.id, stack?.id),
     wordRef = useRef(word),
+    answerInputRef = useRef(answerInput),
     space = useRef(false),
     modified = useRef(false);
   const stroke = useRef<{
@@ -133,13 +142,6 @@ export default function DrawingEditor({
     // Preserve each brush's settings only when switching tools.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool]);
-  const loadWords = useCallback(
-    () =>
-      api<{ words: string[] }>("words")
-        .then((d) => setSuggestions(d.words))
-        .catch((e) => setError(errorMessage(e))),
-    [],
-  );
   const save = useCallback(() => {
     if (!canvas.current || !key.current) return false;
     try {
@@ -148,6 +150,7 @@ export default function DrawingEditor({
         JSON.stringify({
           image: canvas.current.toDataURL(),
           word: wordRef.current,
+          answerInput: answerInputRef.current,
           key: key.current,
           parent: parent.current,
         }),
@@ -224,7 +227,15 @@ export default function DrawingEditor({
     ) {
       wordRef.current = stack?.word || draft.word;
       setWord(wordRef.current);
-      setChoosing(!wordRef.current);
+      answerInputRef.current =
+        stack?.word ||
+        (typeof draft.answerInput === "string"
+          ? draft.answerInput
+          : wordRef.current);
+      setAnswerInput(answerInputRef.current);
+      setChoosing(
+        !wordRef.current || answerInputRef.current !== wordRef.current,
+      );
       key.current = draft.key || key.current;
       parent.current = draft.parent || parent.current;
       const img = new Image();
@@ -235,7 +246,6 @@ export default function DrawingEditor({
       img.onerror = init;
       img.src = draft.image;
     } else init();
-    void loadWords();
     const observer = new ResizeObserver(() => {
       if (viewport.current)
         setFit(Math.min(1, (viewport.current.clientWidth - 4) / 960));
@@ -480,9 +490,19 @@ export default function DrawingEditor({
     setColor(value);
     setHex(value);
   }
-  function choose(value: string) {
+  function choose() {
+    let value: string;
+    try {
+      value = parseAnswers(answerInput).join(",");
+    } catch (e) {
+      setAnswerError(errorMessage(e));
+      return;
+    }
     setWord(value);
     wordRef.current = value;
+    setAnswerInput(value);
+    answerInputRef.current = value;
+    setAnswerError("");
     setChoosing(false);
     save();
   }
@@ -550,17 +570,17 @@ export default function DrawingEditor({
           </h1>
         </div>
         <p className="steps">
-          <span className="step">1</span> Choose a word{" "}
+          <span className="step">1</span> Set answers{" "}
           <span className="step">2</span> Draw it
         </p>
       </div>
       <div className="word-area">
         <div className="secret">
-          <LockSimple size={22} /> Your secret word:{" "}
-          <strong>{word || "Choose below"}</strong>
+          <LockSimple size={22} /> Accepted answers:{" "}
+          <strong>{word ? word.split(",").join(" / ") : "Enter below"}</strong>
           {!stack && (
             <button className="text-button" onClick={() => setConfirm("word")}>
-              Change word
+              Edit answers
             </button>
           )}
         </div>
@@ -587,17 +607,64 @@ export default function DrawingEditor({
       {choosing && (
         <div className="word-picker panel">
           <h2>What will you draw?</h2>
-          <p>One word stays with the whole stack. Pick a good one.</p>
-          <div className="word-options">
-            {suggestions.map((w) => (
-              <button key={w} onClick={() => choose(w)}>
-                {w}
+          <p>
+            Choose your own subject. Add alternative names or translations for
+            the same drawing.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              choose();
+            }}
+            className="answer-form"
+          >
+            <label htmlFor="accepted-answers">Accepted answers</label>
+            <textarea
+              id="accepted-answers"
+              placeholder="e.g. ELON MUSK, Elon, Musk"
+              rows={3}
+              maxLength={MAX_ANSWERS_INPUT_LENGTH}
+              value={answerInput}
+              aria-describedby="answer-help"
+              aria-invalid={!!answerError}
+              onChange={(e) => {
+                setAnswerInput(e.target.value);
+                answerInputRef.current = e.target.value;
+                setAnswerError("");
+                save();
+              }}
+            />
+            <small id="answer-help">
+              Separate words or phrases with English commas (,). Any one exact
+              answer wins. Any language is welcome; capitalization does not
+              matter. Up to 10 answers, 80 characters each.
+            </small>
+            {answerError && (
+              <p className="error-text" role="alert">
+                {answerError}
+              </p>
+            )}
+            <button
+              className="primary"
+              disabled={!ready || !answerInput.trim()}
+            >
+              Save answers & draw <ArrowRight />
+            </button>
+            {word && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAnswerInput(word);
+                  answerInputRef.current = word;
+                  setAnswerError("");
+                  setChoosing(false);
+                  save();
+                }}
+              >
+                Cancel edits
               </button>
-            ))}
-          </div>
-          <button className="text-button" onClick={loadWords}>
-            <ArrowClockwise /> More words
-          </button>
+            )}
+          </form>
         </div>
       )}
       <div className={`editor-workspace ${choosing ? "is-choosing" : ""}`}>
@@ -903,12 +970,12 @@ export default function DrawingEditor({
             <h2 id="editor-confirm">
               {confirm === "clear"
                 ? "Clear your canvas?"
-                : "Choose a different word?"}
+                : "Edit the accepted answers?"}
             </h2>
             <p>
               {confirm === "clear"
                 ? "Your drawing will be cleared. You can undo this."
-                : "Your drawing stays on the canvas. Make sure it matches the new word."}
+                : "Your drawing stays on the canvas. All answers should describe the same subject."}
             </p>
             <div className="button-row">
               <button autoFocus onClick={() => setConfirm(null)}>
@@ -925,7 +992,7 @@ export default function DrawingEditor({
                   setConfirm(null);
                 }}
               >
-                {confirm === "clear" ? "Clear canvas" : "Choose word"}
+                {confirm === "clear" ? "Clear canvas" : "Edit answers"}
               </button>
             </div>
           </div>

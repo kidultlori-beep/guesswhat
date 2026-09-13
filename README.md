@@ -24,10 +24,12 @@ The server listens on all local interfaces. For friends on the same trusted Wi-F
 
 ## Play the first stack
 
-1. Click **Start a stack**, choose a nickname, select a word, and draw it. Publish Floor 1.
+1. Click **Start a stack**, choose a nickname, and enter your own **Accepted answers**. Separate alternative words or phrases with English commas, for example `ELON MUSK,马斯克`. Click **Save answers & draw**, then draw and publish Floor 1. There is no word bank.
 2. Share its link with another browser profile, private window, device, or coworker. A second tab in the same browser normally shares the same player cookie.
-3. That player guesses the word. Wrong answers have a visible cross and consume one of five tries; one try returns every minute. Correct guesses unlock the answer, comments, and the next-floor editor.
-4. Publish an independent drawing of the same word. Each player contributes at most one floor per stack. Stacks finish at 50 floors.
+3. That player enters **one** word or phrase. Matching **any** listed answer wins: both `elon musk` and `马斯克` match the example above. English capitalization, surrounding/repeated whitespace and canonical Unicode spelling are normalized; partial matches and automatic synonyms are not accepted. Wrong answers consume one of five tries; one returns every minute. Correct guesses unlock the answer list, comments, and next-floor editor.
+4. Publish an independent drawing of the same subject. The original answer list remains unchanged through the relay. Each player contributes at most one floor per stack. Stacks finish at 50 floors.
+
+Enter 1–10 distinct accepted answers, each up to 80 characters (809 total input characters). Any language is supported for player-entered content; all interface labels, help and errors remain English. Empty comma-separated entries and full-width commas are rejected with guidance. Duplicate answers are combined. Unfinished answer edits are saved with the draft. Existing single-answer stacks and drafts remain readable without resetting the database; the former hard-coded synonyms no longer apply.
 
 Likes attach to the selected drawing's artist, not the stack founder. Comments unlock only after solving (or for the creator) to reduce spoilers. Rankings count floors, distinct solved stacks, and current drawing likes.
 

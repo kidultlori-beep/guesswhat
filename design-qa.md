@@ -2,6 +2,12 @@
 
 final result: blocked
 
+## Latest functional change — custom accepted answers
+
+The creator now enters comma-separated accepted answers instead of using the original mockup's word suggestions. This is an explicit user-directed behavior change, not an unintended visual difference. The interface remains English; player content may use any language. The old editor mockup no longer specifies the answer-entry form.
+
+Current verification: 16 unit tests and the real HTTP integration test pass, including `ELON MUSK` and `马斯克` with separate players, exact phrase matching, input validation, privacy and persistence. TypeScript and production build also pass. Updated browser tests cover custom input, invalid separators, unfinished draft recovery and the existing game flow; they have not been run. The previous browser acceptance blocker below is unchanged.
+
 ## Visual truth and intended comparison
 
 - Sources: `docs/design/home.png`, `docs/design/stack-detail.png`, `docs/design/drawing-editor.png`, `docs/design/leaderboards.png`, plus the behavior corrections in `docs/design-v1.md`.
@@ -18,7 +24,7 @@ The image-to-code / design-qa workflow requires rendered source-versus-implement
 ## Verified without a browser
 
 - TypeScript typecheck.
-- 12 game/paint unit tests: private sessions/answers, attempts and server-time refill, duplicate handling, one-floor eligibility, parent conflicts, image validation, like attribution, comments/ownership, floor cap, ranking ties, connected fill and persistence after database reopen.
+- Initial release: 12 game/paint unit tests; latest suite: 16. Coverage includes private sessions/answers, custom answer validation/matching, attempts and server-time refill, duplicate handling, one-floor eligibility, parent conflicts, image validation, like attribution, comments/ownership, floor cap, ranking ties, connected fill and persistence after database reopen.
 - Production compilation with Next.js.
 - Real HTTP integration on an isolated database: two players publish, guess, solve, relay, like, comment/delete, rank and fetch PNGs; anonymous/forged identity/cross-site writes denied.
 - Prettier format check and runtime dependency audit (zero known vulnerabilities at check time).

@@ -30,6 +30,7 @@ import type {
   RankRow,
 } from "@/lib/types";
 import { api, imageUrl, stackName, errorMessage } from "@/lib/client";
+import { MAX_ANSWER_LENGTH } from "@/lib/answers";
 import DrawingEditor from "./DrawingEditor";
 
 type RequireUser = (action: () => void) => void;
@@ -173,7 +174,7 @@ export default function GameApp() {
       </main>
       {!isEditor && (
         <footer className="site-footer">
-          One secret word. A new drawing on every floor.
+          One subject. A new drawing on every floor.
         </footer>
       )}
       {identityOpen && (
@@ -319,7 +320,7 @@ function Home({
     <>
       <section className="hero">
         <h1>Every drawing builds a story.</h1>
-        <p>Pick a stack, guess the word, and draw the next floor.</p>
+        <p>Pick a stack, guess the answer, and draw the next floor.</p>
         <button className="primary hero-cta" onClick={() => requireUser(onNew)}>
           <Plus size={29} /> Start a stack
         </button>
@@ -382,8 +383,8 @@ function Home({
           <h2>Big stories start with one little drawing.</h2>
           <p>No stacks yet. Yours could be the first.</p>
           <p className="hint">
-            Draw a secret word. Share your stack. Friends guess it and add their
-            own drawing.
+            Draw your own subject. Share your stack. Friends guess it and add
+            their own drawing.
           </p>
         </div>
       )}
@@ -628,12 +629,14 @@ function GuessPanel({
         <>
           <CheckCircle className="green" size={44} weight="duotone" />
           <h2>{own ? "Your stack is growing." : "You got it!"}</h2>
-          <p>The secret word is</p>
-          <div className="revealed-word">{data.word}</div>
+          <p>Accepted answers</p>
+          <div className="revealed-word">
+            {data.word?.split(",").join(" / ")}
+          </div>
           {data.canDraw ? (
             <>
               <p>
-                Same word. Your imagination.
+                Same subject. Your imagination.
                 <br />
                 Add your drawing to the story.
               </p>
@@ -655,8 +658,11 @@ function GuessPanel({
       ) : (
         <>
           <Lightbulb size={39} className="blue" weight="duotone" />
-          <h2>What’s the word?</h2>
-          <p>Every floor is a different drawing of the same secret word.</p>
+          <h2>What’s the answer?</h2>
+          <p>
+            Every floor shows the same subject. Guess one word or phrase. Match
+            any accepted answer to win.
+          </p>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -670,7 +676,7 @@ function GuessPanel({
               id="guess"
               placeholder="Type your guess…"
               value={guess}
-              maxLength={40}
+              maxLength={MAX_ANSWER_LENGTH}
               onChange={(e) => setGuess(e.target.value)}
               autoComplete="off"
               disabled={busy}
@@ -719,7 +725,7 @@ function GuessPanel({
       )}
       <div className="how-it-works">
         <h3>A little team effort</h3>
-        <p>1. Guess the secret word.</p>
+        <p>1. Guess an accepted answer.</p>
         <p>2. Draw your take on it.</p>
         <p>3. Watch the stack grow.</p>
       </div>
@@ -807,7 +813,7 @@ function Social({
       if (navigator.share) {
         await navigator.share({
           title: `${stackName(data.number)} — DrawStacks`,
-          text: "Can you guess the secret word? Draw the next floor!",
+          text: "Can you guess the answer? Draw the next floor!",
           url,
         });
       } else if (navigator.clipboard) {
@@ -920,7 +926,7 @@ function Social({
             <LockSimple size={24} />
             <div>
               <strong>A spoiler-free zone.</strong>
-              <p>Comments unlock after you guess the word.</p>
+              <p>Comments unlock after you guess an accepted answer.</p>
             </div>
           </div>
         )}

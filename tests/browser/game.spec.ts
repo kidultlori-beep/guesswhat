@@ -80,6 +80,25 @@ async function canvasData(page: Page) {
     .getByLabel("Drawing canvas")
     .evaluate((c: HTMLCanvasElement) => c.toDataURL());
 }
+test("custom answer editor validates separators and preserves unfinished input", async ({
+  page,
+  context,
+}) => {
+  await identify(context, "Answer editor");
+  await page.goto("/new");
+  const field = page.getByLabel("Accepted answers", { exact: true });
+  await field.fill("ELON MUSK,马斯克");
+  await page.reload();
+  await expect(field).toHaveValue("ELON MUSK,马斯克");
+  await field.fill("ELON MUSK，马斯克");
+  await page.getByRole("button", { name: "Save answers & draw" }).click();
+  await expect(page.getByRole("alert")).toContainText("English commas");
+  await field.fill(" ELON  MUSK,马斯克,elon musk ");
+  await page.getByRole("button", { name: "Save answers & draw" }).click();
+  await expect(page.locator(".secret strong")).toHaveText("ELON MUSK / 马斯克");
+  await page.reload();
+  await expect(page.locator(".secret strong")).toHaveText("ELON MUSK / 马斯克");
+});
 test("two players create, guess, relay, socialize, share and rank; real desktop/mobile screens", async ({
   page,
   browser,
@@ -97,9 +116,11 @@ test("two players create, guess, relay, socialize, share and rank; real desktop/
   await expect(
     page.getByRole("heading", { name: "What will you draw?" }),
   ).toBeVisible();
-  const chosen = page.locator(".word-options button").first();
-  const word = (await chosen.textContent())!;
-  await chosen.click();
+  const word = "雨伞";
+  await page
+    .getByLabel("Accepted answers", { exact: true })
+    .fill("UMBRELLA,雨伞");
+  await page.getByRole("button", { name: "Save answers & draw" }).click();
   await page
     .getByRole("button", { name: "Publish stack", exact: true })
     .click();
@@ -228,7 +249,10 @@ test("two players create, guess, relay, socialize, share and rank; real desktop/
     ),
   ).toBe(true);
   await page.goto("/new");
-  await page.locator(".word-options button").first().click();
+  await page
+    .getByLabel("Accepted answers", { exact: true })
+    .fill("ELON MUSK,马斯克");
+  await page.getByRole("button", { name: "Save answers & draw" }).click();
   await expect(page.getByLabel("Drawing canvas")).toBeVisible();
   await page.screenshot({
     path: "test-results/qa/editor-mobile.png",
@@ -248,7 +272,10 @@ test("editor supports erase, shapes, fill, selection, undo/redo, clear and zoom"
 }) => {
   await identify(context, "Painter");
   await page.goto("/new");
-  await page.locator(".word-options button").first().click();
+  await page
+    .getByLabel("Accepted answers", { exact: true })
+    .fill("custom subject");
+  await page.getByRole("button", { name: "Save answers & draw" }).click();
   const blank = await canvasData(page);
   await stroke(page, [
     [0.2, 0.3],

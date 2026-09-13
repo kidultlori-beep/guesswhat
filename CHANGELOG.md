@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-13 — Creator-defined multilingual accepted answers
+
+- Removed the built-in word bank, automatic synonyms, suggestion picker and `/api/words` endpoint. Creators now enter their own comma-separated words/phrases in an English **Accepted answers** form.
+- Matching any one complete entry wins: `ELON MUSK,马斯克` accepts either `elon musk` or `马斯克`. Matching ignores case, extra whitespace and canonical Unicode differences; partial names, unspecified synonyms and batches of guesses do not count.
+- Shared browser/server validation supports 1–10 distinct entries of up to 80 characters each (809 input characters total), combines duplicates and rejects blank entries/full-width separators with English guidance. The guess input limit now matches the per-answer limit.
+- Preserved private answers, one counted solve, attempt recovery and the immutable relay answer list. The existing database `word` field and older single-answer drafts remain compatible; no player database reset or rewrite. Previously implicit word-bank aliases are no longer accepted unless explicitly listed; existing solve records remain valid.
+- Added editable-answer draft autosave, unfinished input restoration and cancel-edit behavior. Updated all affected instructions, success text, sharing copy and metadata in English. Non-English text is allowed as user content, not interface chrome.
+- Verification: 16 passing unit tests and one passing real HTTP integration test, covering both example answers with separate players, normalization, invalid input, privacy, unchanged relay answers and persistence; TypeScript and production build passed. Browser test cases were updated but not executed: the previously documented browser verification/permission gap remains.
+- Handoff: test custom-answer entry/edit/reload and narrow-screen wrapping in the browser when available. Setup and architecture docs reflect the new contract. This update is committed and pushed with its tests and log; no runtime data is included.
+
 ## 2026-09-13 — First playable local/LAN game
 
 - Implemented the English cream/hand-drawn Home, stack detail, new/relay Canvas editor and three leaderboards using Next.js, React, locally served Patrick Hand/Nunito fonts and Phosphor icons.

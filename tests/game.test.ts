@@ -2,7 +2,7 @@ import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { Game, GameError } from "../src/lib/game";
 import { PNG } from "pngjs";
-import { WORDS } from "../src/lib/words";
+import { parseAnswers, matchesAnswer } from "../src/lib/answers";
 import { floodFill } from "../src/lib/paint";
 import { mkdtempSync, existsSync, unlinkSync, rmdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -29,7 +29,7 @@ function setup(t: TestContext) {
     b = game.identify("Bob"),
     c = game.identify("Charlie");
   const s = game.publish(a.user.id, {
-    word: "bicycle",
+    word: "bicycle,bike",
     image: picture,
     key: "initial-0001",
   });
@@ -38,9 +38,92 @@ function setup(t: TestContext) {
 function status(code: number) {
   return (e: unknown) => e instanceof GameError && e.status === code;
 }
-test("curated word bank is exactly 80 unique words", () => {
-  assert.equal(WORDS.length, 80);
-  assert.equal(new Set(WORDS).size, 80);
+test("custom answers trim, normalize spacing and deduplicate", () => {
+  assert.deepEqual(parseAnswers(" ELON  MUSK,马斯克,elon musk "), [
+    "ELON MUSK",
+    "马斯克",
+  ]);
+  assert.deepEqual(parseAnswers("Cafe\u0301,CAFÉ"), ["Café"]);
+});
+test("custom answers reject invalid separators, blanks and oversized input", () => {
+  for (const raw of [
+    "",
+    null,
+    123,
+    " , ",
+    ",cat",
+    "cat,",
+    "cat,,dog",
+    "ELON MUSK，马斯克",
+    "x".repeat(81),
+    Array.from({ length: 11 }, (_, i) => `answer${i}`).join(","),
+    "x".repeat(810),
+    "cat\u0000",
+  ])
+    assert.throws(() => parseAnswers(raw));
+  assert.equal(parseAnswers("a".repeat(80))[0].length, 80);
+  assert.equal(
+    parseAnswers(Array.from({ length: 10 }, (_, i) => String(i)).join(","))
+      .length,
+    10,
+  );
+});
+test("exact phrase matching accepts either language, not partials or comma-separated guesses", () => {
+  for (const guess of ["ELON MUSK", "elon musk", "  Elon   Musk  ", "马斯克"])
+    assert.equal(matchesAnswer(guess, "ELON MUSK,马斯克"), true);
+  for (const guess of [
+    "Elon",
+    "Musk",
+    "马斯",
+    "ELON MUSK,马斯克",
+    "billionaire",
+    "",
+  ])
+    assert.equal(matchesAnswer(guess, "ELON MUSK,马斯克"), false);
+  assert.equal(matchesAnswer("bike", "bicycle"), false);
+  assert.equal(matchesAnswer(" CAT ", "cat"), true);
+  assert.equal(matchesAnswer("CAFÉ", "Cafe\u0301"), true);
+});
+test("each custom alias independently solves and relay cannot change accepted answers", (t) => {
+  const { game, a, b, c } = setup(t);
+  const s = game.publish(a.user.id, {
+    word: " ELON   MUSK,马斯克,elon musk ",
+    image: picture,
+    key: "custom-answers-1",
+  });
+  assert.equal(game.detail(s.id, a.user.id).word, "ELON MUSK,马斯克");
+  const publicData = JSON.stringify({
+    detail: game.detail(s.id, b.user.id),
+    list: game.list(),
+    rank: game.rankings("stacks"),
+  });
+  assert(!publicData.includes("ELON MUSK"));
+  assert(!publicData.includes("马斯克"));
+  assert.equal(game.guess(b.user.id, s.id, "elon  musk").correct, true);
+  assert.equal(game.guess(c.user.id, s.id, "马斯克").correct, true);
+  assert.equal(game.guess(b.user.id, s.id, "马斯克").duplicate, true);
+  assert.equal(game.rankings("guessers", b.user.id).mine?.score, 1);
+  assert.equal(game.detail(s.id, b.user.id).remaining, 5);
+  game.publish(
+    b.user.id,
+    {
+      word: "unauthorized replacement",
+      image: picture,
+      key: "custom-relay-1",
+      parent: s.floor,
+    },
+    s.id,
+  );
+  assert.equal(game.detail(s.id, c.user.id).word, "ELON MUSK,马斯克");
+  assert.throws(
+    () =>
+      game.publish(a.user.id, {
+        word: "a,,b",
+        image: picture,
+        key: "invalid-custom-1",
+      }),
+    status(400),
+  );
 });
 test("sessions are private, expiring, independent from public ids", (t) => {
   const { game, a, advance } = setup(t);
@@ -51,6 +134,12 @@ test("sessions are private, expiring, independent from public ids", (t) => {
   assert.throws(() => game.identify("<script>"), status(400));
   advance(31 * 86400000);
   assert.equal(game.user(a.token), null);
+});
+test("existing single-answer stacks work without a migration or automatic aliases", (t) => {
+  const { game, b, c, s } = setup(t);
+  game.db.prepare("UPDATE stacks SET word=? WHERE id=?").run("bicycle", s.id);
+  assert.equal(game.guess(b.user.id, s.id, "BICYCLE").correct, true);
+  assert.equal(game.guess(c.user.id, s.id, "bike").correct, false);
 });
 test("answer and other players guesses never leak to unsolved viewers", (t) => {
   const { game, a, b, c, s } = setup(t);
@@ -65,7 +154,7 @@ test("answer and other players guesses never leak to unsolved viewers", (t) => {
   assert(!publicData.includes("scooter"));
   assert(!publicData.includes(a.token!));
   assert.equal(game.detail(s.id, b.user.id).word, null);
-  assert.equal(game.detail(s.id, a.user.id).word, "bicycle");
+  assert.equal(game.detail(s.id, a.user.id).word, "bicycle,bike");
   assert.throws(() => game.comments(b.user.id, s.floor), status(403));
 });
 test("tries decrement once, normalize duplicates, refill on server time, correct is free", (t) => {
@@ -83,7 +172,7 @@ test("tries decrement once, normalize duplicates, refill on server time, correct
   assert.equal(game.detail(s.id, b.user.id).remaining, 1);
   assert.equal(game.guess(b.user.id, s.id, " BIKE ").correct, true);
   assert.equal(game.detail(s.id, b.user.id).remaining, 1);
-  assert.equal(game.detail(s.id, b.user.id).word, "bicycle");
+  assert.equal(game.detail(s.id, b.user.id).word, "bicycle,bike");
   game.guess(b.user.id, s.id, "bicycle");
   assert.equal(game.rankings("guessers").rows[0].score, 1);
   advance(600000);
@@ -162,7 +251,7 @@ test("blank, malformed, wrong-size images rejected and no orphan stacks created"
   assert.throws(
     () =>
       game.publish(a.user.id, {
-        word: "not-in-bank",
+        word: " , ",
         key: "invalid-02",
         image: picture,
       }),
@@ -270,16 +359,16 @@ test("server restart preserves drawings, identity, guesses and statistics", () =
       b = game.identify("Persistent Bob");
     const s = game.publish(a.user.id, {
       image: picture,
-      word: "cat",
+      word: "ELON MUSK,马斯克",
       key: "persistent-1",
     });
-    game.guess(b.user.id, s.id, "cat");
+    game.guess(b.user.id, s.id, "马斯克");
     game.like(b.user.id, s.floor, true);
     game.comment(b.user.id, s.floor, "Still here");
     game.db.close();
     game = new Game(path);
     assert.equal(game.user(a.token)?.id, a.user.id);
-    assert.equal(game.detail(s.id, b.user.id).word, "cat");
+    assert.equal(game.detail(s.id, b.user.id).word, "ELON MUSK,马斯克");
     assert.equal(game.detail(s.id).floors[0].likes, 1);
     assert.equal(game.comments(a.user.id, s.floor)[0].text, "Still here");
     assert.equal(game.rankings("guessers").rows[0].score, 1);

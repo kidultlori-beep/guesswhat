@@ -4,7 +4,12 @@ import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { PNG } from "pngjs";
-import { WORDS, ALIASES, normalize } from "./words";
+import {
+  parseAnswers,
+  matchesAnswer,
+  normalize,
+  MAX_ANSWER_LENGTH,
+} from "./answers";
 import type { User, StackDetail, StackSummary, Floor, RankRow } from "./types";
 
 export class GameError extends Error {
@@ -289,17 +294,18 @@ export class Game {
           );
         index = latest.floor_index + 1;
       } else {
-        if (
-          typeof input.word !== "string" ||
-          !(WORDS as readonly string[]).includes(input.word)
-        )
-          fail(400, "Choose a word from the suggestions.");
+        let answers: string;
+        try {
+          answers = parseAnswers(input.word).join(",");
+        } catch (error) {
+          return fail(400, (error as Error).message);
+        }
         id = randomUUID();
         this.db
           .prepare(
             "INSERT INTO stacks(id,word,creator_id,created,updated) VALUES(?,?,?,?,?)",
           )
-          .run(id, input.word as string, uid, this.now(), this.now());
+          .run(id, answers, uid, this.now(), this.now());
       }
       const floor = randomUUID();
       this.db
@@ -315,7 +321,7 @@ export class Game {
     });
   }
   guess(uid: string, id: string, raw: unknown) {
-    const guess = normalize(text(raw, 1, 40));
+    const guess = normalize(text(raw, 1, MAX_ANSWER_LENGTH));
     return this.transaction(() => {
       const s = this.stack(id);
       if (s.creator_id === uid)
@@ -332,8 +338,7 @@ export class Game {
       const meter = this.meter(uid, id);
       if (meter.remaining < 1)
         fail(429, "No tries left yet. Wait for the next refill.");
-      const correct =
-        guess === s.word || (ALIASES[s.word] ?? []).includes(guess);
+      const correct = matchesAnswer(guess, s.word);
       this.db
         .prepare(
           "INSERT INTO guesses(user_id,stack_id,text,correct,created) VALUES(?,?,?,?,?)",

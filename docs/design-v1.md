@@ -16,15 +16,17 @@ The attached Neal.fun screenshot is a visual reference only. Use original DrawSt
 | --- | --- | --- | --- |
 | Home | `/` | Choose someone else's stack or start one | [Home](design/home.png) |
 | Stack detail | `/stacks/:id` | View floors, guess, react and join the relay | [Stack detail](design/stack-detail.png) |
-| New stack / relay editor | `/new`, `/stacks/:id/draw` | Choose a word when opening a stack; draw and publish | [Drawing editor](design/drawing-editor.png) |
+| New stack / relay editor | `/new`, `/stacks/:id/draw` | Enter accepted answers when opening a stack; draw and publish | [Drawing editor](design/drawing-editor.png) |
 | Leaderboards | `/leaderboards` | Explore three rankings | [Leaderboards](design/leaderboards.png) |
 
 These are four screens of one design, not alternatives. Mockup counts are illustrative and are not real activity. The specifications below govern behavior when image details differ.
 
+Latest user revision: replace the word-selection controls shown in the original editor mockup with a free-text, comma-separated accepted-answer form. All UI labels remain English; user answers can be multilingual. Earlier references to one "word" mean the one shared subject, which can now have several explicitly accepted names or phrases.
+
 ## Core loop and rules
 
 1. Browse stacks without creating an account. Before guessing, drawing, liking or commenting, choose a nickname in a small dialog. Return to the interrupted action afterward.
-2. Start a stack: select one of six English word suggestions from an initial 80-word set, optionally refresh suggestions, then draw the first floor.
+2. Start a stack: write your own accepted answers, separated by English commas, then draw the first floor. Words, phrases and translations in any language are allowed, e.g. `ELON MUSK,马斯克`. There is no word bank or suggestion refresh.
 3. Publish: create both the stack and Floor 1 together. A draft does not appear on the homepage.
 4. Visit a stack: open the latest floor, with access to earlier floors. All floors illustrate the same secret word.
 5. Incorrect guess: show a coral cross, `Not quite! Try again.`, reduce the remaining attempts by one, and retain the guess in the player's private history.
@@ -33,9 +35,9 @@ These are four screens of one design, not alternatives. Mockup counts are illust
 
 Proposed first-version defaults, chosen to resolve conflicting older documents:
 
-- One word per stack, unchanged through all floors. New words belong to new stacks.
+- One subject and one creator-defined answer list per stack, unchanged through all floors. Matching any one complete answer wins. Use 1–10 distinct entries, each at most 80 characters, separated by English commas (809 input characters total). Reject empty entries/full-width separators, deduplicate normalized answers, and preserve the original display spelling. New subjects belong to new stacks.
 - Five attempts per player per stack; recover one attempt every 60 seconds, capped at five. A correct answer consumes no attempt. Server time governs recovery; show `Next try in 00:42` when useful.
-- Empty input, connection failures and an identical repeated wrong guess do not consume attempts. Normalize case and surrounding whitespace; use explicitly curated word aliases, not fuzzy acceptance.
+- Empty input, connection failures and an identical repeated wrong guess do not consume attempts. Normalize case, Unicode NFC and surrounding/repeated whitespace. Accept only the creator's explicit answers, not automatic synonyms, substrings, fuzzy guesses or comma-separated batches of guesses.
 - One first successful solve per player per stack counts toward the ranking. Authors cannot solve their own stack for points.
 - One published floor per player per stack, including the opening floor. Leaving the editor preserves the draft and does not spend the relay opportunity.
 - Fifty published floors complete a stack. Completed stacks remain viewable, guessable, likeable and commentable, but cannot receive another floor.
@@ -69,7 +71,7 @@ The initial implementation should show errors persistently until the next attemp
 
 ## Drawing editor
 
-Use the same editor for opening and relaying. Opening shows a private word banner and `Change word`. Relaying shows the solved word plus `Previous floor` reference toggle; it has no word picker. Drawing itself occupies most of the workspace.
+Use the same editor for opening and relaying. Opening shows a private `Accepted answers` banner and `Edit answers`. The English-labeled input explains comma-separated alternatives, and `Save answers & draw` validates them before drawing. Relaying shows the accepted answers plus `Previous floor` reference toggle; it cannot edit the list. Unfinished input is included in local drafts. Drawing itself occupies most of the workspace.
 
 | Tool / setting | First-version behavior |
 | --- | --- |

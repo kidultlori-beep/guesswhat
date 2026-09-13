@@ -96,11 +96,12 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   const created = await call(
     "stacks",
     "POST",
-    { word: "bicycle", key: "http-create-1", image },
+    { word: " ELON MUSK,马斯克,elon musk ", key: "http-create-1", image },
     a.cookie,
   );
   assert.equal(created.status, 201);
   const s = await created.json();
+  assert.equal((await call("words")).status, 404);
   const publicView = await (await call(`stacks/${s.id}`)).json();
   assert.equal(publicView.word, null);
   assert.equal(publicView.floors.length, 1);
@@ -124,12 +125,37 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
     await call(`stacks/${s.id}`, "GET", undefined, a.cookie)
   ).json();
   assert.equal(own.guesses.length, 0);
-  assert.equal(own.word, "bicycle");
+  assert.equal(own.word, "ELON MUSK,马斯克");
   const solve = await (
-    await call(`stacks/${s.id}/guess`, "POST", { guess: "bike" }, b.cookie)
+    await call(`stacks/${s.id}/guess`, "POST", { guess: "马斯克" }, b.cookie)
   ).json();
   assert.equal(solve.correct, true);
   assert.equal(solve.state.canDraw, true);
+  const c = await player("HTTP Charlie");
+  assert.equal(
+    (
+      await (
+        await call(
+          `stacks/${s.id}/guess`,
+          "POST",
+          { guess: "  elon  musk  " },
+          c.cookie,
+        )
+      ).json()
+    ).correct,
+    true,
+  );
+  assert.equal(
+    (
+      await call(
+        "stacks",
+        "POST",
+        { word: "bad,,answer", key: "http-invalid-answer", image },
+        a.cookie,
+      )
+    ).status,
+    400,
+  );
   assert.equal(
     (await call(`floors/${s.floor}/like`, "PUT", { liked: true }, b.cookie))
       .status,

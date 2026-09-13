@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { game } from "@/lib/server";
 import { GameError } from "@/lib/game";
-import { WORDS } from "@/lib/words";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 async function handle(req: NextRequest) {
@@ -63,10 +62,6 @@ async function handle(req: NextRequest) {
       }
     }
     if (method === "GET") {
-      if (p[0] === "words")
-        return json({
-          words: [...WORDS].sort(() => Math.random() - 0.5).slice(0, 6),
-        });
       if (p[0] === "stacks" && p.length === 1) {
         const offset = Number(req.nextUrl.searchParams.get("offset") || 0);
         return json({
@@ -105,6 +100,7 @@ async function handle(req: NextRequest) {
         );
       if (p[0] === "users" && p[2] === "contributions")
         return json({ floors: game.contributions(p[1]) });
+      throw new GameError(404, "Endpoint not found.");
     }
     if (!user) throw new GameError(401, "Choose a nickname to join in.");
     if (method === "POST" && p[0] === "stacks") {

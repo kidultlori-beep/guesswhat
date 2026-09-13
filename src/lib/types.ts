@@ -30,6 +30,7 @@ export interface StackDetail {
   creator: string;
   creatorId: string;
   floors: Floor[];
+  // Comma-separated accepted answers, visible only to the creator/solved player.
   word: string | null;
   solved: boolean;
   contributed: boolean;
