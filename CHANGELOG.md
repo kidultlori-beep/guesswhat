@@ -8,7 +8,8 @@
 - Preserved private answers, one counted solve, attempt recovery and the immutable relay answer list. The existing database `word` field and older single-answer drafts remain compatible; no player database reset or rewrite. Previously implicit word-bank aliases are no longer accepted unless explicitly listed; existing solve records remain valid.
 - Added editable-answer draft autosave, unfinished input restoration and cancel-edit behavior. Updated all affected instructions, success text, sharing copy and metadata in English. Non-English text is allowed as user content, not interface chrome.
 - Verification: 16 passing unit tests and one passing real HTTP integration test, covering both example answers with separate players, normalization, invalid input, privacy, unchanged relay answers and persistence; TypeScript and production build passed. Browser test cases were updated but not executed: the previously documented browser verification/permission gap remains.
-- Handoff: test custom-answer entry/edit/reload and narrow-screen wrapping in the browser when available. Setup and architecture docs reflect the new contract. This update is committed and pushed with its tests and log; no runtime data is included.
+- Handoff: test custom-answer entry/edit/reload and narrow-screen wrapping in the browser when available. Setup and architecture docs reflect the new contract. Source, tests and log are committed together; no runtime data is included.
+- Synchronization status: initial fetch/push and an HTTP/1.1 retry failed with connection resets / inability to connect to github.com:443. Feature commit `72b131e` is preserved locally; upload and remote verification remain pending. Retry a normal (never forced) push when connectivity returns.
 
 ## 2026-09-13 — First playable local/LAN game
 
