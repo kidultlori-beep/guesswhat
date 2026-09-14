@@ -20,7 +20,7 @@ No sample stacks are inserted on normal startup. All test state is isolated. Sel
 | comments | Plain text, owner and target floor; public after that floor is solved, privately available to its artist beforehand |
 | publications | Player + idempotency key → original publication result |
 
-Publishing and guessing use `BEGIN IMMEDIATE` transactions. Publishing checks eligibility, the 50-floor cap and expected latest parent before allocating the next floor. New-stack creation and Floor 1 are atomic. Database initialization is idempotent. Future schema changes need explicit migrations before modifying an existing installation.
+Publishing and guessing use `BEGIN IMMEDIATE` transactions. Publishing checks eligibility, the 50-floor cap and expected latest parent before allocating the next floor. New-stack creation and Floor 1 are atomic. Database initialization is idempotent and deferred until the first API request, so `next build` never opens the mounted production database while the live service is using it. Future schema changes need explicit migrations before modifying an existing installation.
 
 ## API contracts
 

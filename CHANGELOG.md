@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-14 — Deployment-safe SQLite initialization
+
+- Deferred the shared `Game` and SQLite connection until the first API request. Render can now build a replacement release while the previous instance keeps the persistent database open.
+- This fixes the production rebuild failure `Failed to collect configuration for /api/[...path]` caused by `database is locked`; runtime schema initialization and migrations still run once per server process.
+- Verification: formatting, TypeScript, 19 unit/migration tests, the production build and the real HTTP integration test passed.
+- Handoff: rebuild on Render, confirm the deployment reaches Live, then verify canonical and Open Graph URLs use `https://draw.annieway.world`.
+
 ## 2026-09-14 — Editorial share cards and favicon assets
 
 - Replaced the pixel-game social card shell with a warm editorial layout: cream paper, serif display copy, fine red rules and the real floor artwork. The card remains spoiler-free and 1200 × 630.

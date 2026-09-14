@@ -1,4 +1,4 @@
-import { game } from "@/lib/server";
+import { getGame } from "@/lib/server";
 import { renderShareCard } from "@/lib/share-card";
 
 export const runtime = "nodejs";
@@ -9,6 +9,7 @@ export async function GET(
   context: { params: Promise<{ floorId: string }> },
 ) {
   const { floorId } = await context.params;
+  const game = getGame();
   const floor = game.db
     .prepare(
       `SELECT f.image,f.floor_index floor,s.number,u.nickname author

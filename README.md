@@ -44,6 +44,7 @@ Drafts autosave to **this browser/device** after completed actions; a reload res
 ## Data and identity
 
 - Published state: `data/drawstacks.db` (SQLite WAL), including drawings and thumbnails. It survives server restarts. Set `DRAWSTACKS_DB` to use another persistent filesystem path.
+- The API opens SQLite lazily on the first request. Production builds therefore do not access or migrate the live database while the currently deployed service is still using it.
 - Private identity: opaque, HTTP-only, same-site browser cookie, valid for 30 days. The database stores a token hash; public user IDs cannot authenticate. Clearing/expiring cookies creates a new player; there is no password recovery or cross-device login in v1.
 - Drafts: local storage, separated by player and stack. They are not uploaded before publication and are not synchronized across devices.
 - Back up the database with the server stopped, or use a SQLite-aware backup tool. Do not copy only the main database while WAL writes are active.

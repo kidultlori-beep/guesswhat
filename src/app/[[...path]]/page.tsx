@@ -1,7 +1,7 @@
 import GameApp from "@/components/GameApp";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { game } from "@/lib/server";
+import { getGame } from "@/lib/server";
 import { floorSharePath } from "@/lib/share";
 
 type PageProps = {
@@ -33,6 +33,7 @@ export async function generateMetadata({
 
   const query = await searchParams;
   const requested = Array.isArray(query.floor) ? query.floor[0] : query.floor;
+  const game = getGame();
   const floor = game.db
     .prepare(
       `SELECT f.id,f.floor_index floor,s.number,u.nickname author

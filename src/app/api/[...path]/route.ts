@@ -1,11 +1,12 @@
 // JSON API: validate sessions and same-origin writes before applying server-side game rules.
 import { NextRequest, NextResponse } from "next/server";
-import { game } from "@/lib/server";
+import { getGame } from "@/lib/server";
 import { GameError } from "@/lib/game";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 async function handle(req: NextRequest) {
   try {
+    const game = getGame();
     const p = req.nextUrl.pathname.slice(5).split("/"),
       method = req.method;
     const token = req.cookies.get("drawstacks_session")?.value,
