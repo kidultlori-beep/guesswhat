@@ -56,7 +56,7 @@ Drafts retain the compatible `word` field and add `answerInput` plus `hint` for 
 
 ### Social sharing
 
-Selected-floor pages emit Open Graph and X `summary_large_image` metadata. The dynamic card contains only public floor art, stack/floor numbers, artist nickname and neutral invitation copy; its renderer must never query guesses or answers. `src/lib/share.ts` owns canonical floor paths and platform intent encoding. The X action opens `https://x.com/intent/tweet` in a new browsing context, so the player reviews and submits the post on X; no X token is collected.
+Selected-floor pages emit Open Graph and X `summary_large_image` metadata. The dynamic editorial card contains only public floor art, stack/floor numbers, artist nickname and neutral invitation copy; its renderer must never query guesses or answers. The home page uses a separate static 1200 × 630 brand card. SVG and 32/96 px PNG favicon assets are linked from the root metadata. `src/lib/share.ts` owns canonical floor paths and platform intent encoding. The X action opens `https://x.com/intent/tweet` in a new browsing context, so the player reviews and submits the post on X; no X token is collected.
 
 Use `DRAWSTACKS_PUBLIC_URL` in hosted/proxied environments. Without it, metadata derives the request origin. Social crawlers cannot reach localhost or private LAN origins. Future platform buttons should be adapters around the same canonical URL and metadata, with the native Web Share API remaining the device-level fallback. OAuth posting APIs are a separate, explicit-consent feature and must not reuse the anonymous game cookie as social authorization.
 

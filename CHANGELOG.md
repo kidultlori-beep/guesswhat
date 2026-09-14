@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-14 — Editorial share cards and favicon assets
+
+- Replaced the pixel-game social card shell with a warm editorial layout: cream paper, serif display copy, fine red rules and the real floor artwork. The card remains spoiler-free and 1200 × 630.
+- Added a separate static home Open Graph image plus SVG, 32 px PNG and 96 px PNG favicon assets. Root metadata now advertises canonical, Open Graph, X card and icon URLs from `DRAWSTACKS_PUBLIC_URL`.
+- Added a repeatable asset-generation script and declared Sharp as a production dependency for deterministic server-side social-card rendering.
+- Verification: generated image assets were inspected; formatting, TypeScript, 19 unit/migration tests, production build and the real HTTP integration test passed. The Playwright suite could not start because its Chromium binary is not installed on this workstation.
+- Handoff: deploy the verified commit, set Render `DRAWSTACKS_PUBLIC_URL=https://draw.annieway.world`, and confirm the live HTML no longer references `seefon.com` before testing an X preview.
+
 ## 2026-09-14 — Public wrong guesses, required hints and domain migration
 
 - Made the latest floor's incorrect guesses visible to every visitor, including the guesser's public nickname. Correct guesses and accepted answers remain secret until the first successful solve.

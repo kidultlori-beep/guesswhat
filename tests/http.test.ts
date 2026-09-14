@@ -66,6 +66,22 @@ async function player(nickname: string) {
   };
 }
 test("real HTTP publication, permissions, private guesses, social actions, relay and images", async () => {
+  const homeHtml = await (await fetch(root)).text();
+  assert.match(homeHtml, /summary_large_image/);
+  assert.match(homeHtml, /\/og\/home\.png/);
+  for (const asset of [
+    ["/icon.svg", "image/svg+xml"],
+    ["/icons/favicon-32.png", "image/png"],
+    ["/icons/favicon-96.png", "image/png"],
+    ["/og/home.png", "image/png"],
+  ]) {
+    const response = await fetch(`${root}${asset[0]}`);
+    assert.equal(response.status, 200);
+    assert.equal(
+      (response.headers.get("content-type") || "").split(";")[0],
+      asset[1],
+    );
+  }
   const a = await player("HTTP Alice"),
     b = await player("HTTP Bob");
   const png = new PNG({ width: 960, height: 640 });

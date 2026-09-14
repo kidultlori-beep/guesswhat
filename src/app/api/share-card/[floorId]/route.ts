@@ -22,7 +22,7 @@ export async function GET(
 
   return new Response(
     new Uint8Array(
-      renderShareCard({
+      await renderShareCard({
         image: floor.image,
         stackNumber: floor.number,
         floorIndex: floor.floor,
