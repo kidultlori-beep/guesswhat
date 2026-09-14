@@ -4,8 +4,8 @@
 
 - Deferred the shared `Game` and SQLite connection until the first API request. Render can now build a replacement release while the previous instance keeps the persistent database open.
 - This fixes the production rebuild failure `Failed to collect configuration for /api/[...path]` caused by `database is locked`; runtime schema initialization and migrations still run once per server process.
-- Verification: formatting, TypeScript, 19 unit/migration tests, the production build and the real HTTP integration test passed.
-- Handoff: rebuild on Render, confirm the deployment reaches Live, then verify canonical and Open Graph URLs use `https://draw.annieway.world`.
+- Verification: formatting, TypeScript, 19 unit/migration tests, the production build and the real HTTP integration test passed. Render auto-deploy `dep-dak0hk5g1s2s73cth9ug` reached Live in 1m14s. Public checks returned 200 for the home page, SVG favicon, static home card and dynamic floor card; home and floor canonical/Open Graph/X image URLs all use `https://draw.annieway.world`.
+- Handoff: the hostname migration and social metadata fix are live. Use a fresh X test post or Card Validator check to refresh any platform cache before announcing the site.
 
 ## 2026-09-14 — Editorial share cards and favicon assets
 
