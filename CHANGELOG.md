@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-14 — Public wrong guesses, required hints and domain migration
+
+- Made the latest floor's incorrect guesses visible to every visitor, including the guesser's public nickname. Correct guesses and accepted answers remain secret until the first successful solve.
+- Added a required 1–160 character public hint whenever an artist sets answers for a new stack or relay floor. Hints autosave with drafts and appear beside the guessing form.
+- Added an idempotent SQLite migration for the new floor hint column. Existing production floors remain intact with an empty hint; new publications require one.
+- Updated deployment documentation and canonical-origin configuration for the move from `seefon.com` to `https://draw.annieway.world`.
+- Verification: 19 unit/migration tests, TypeScript without incremental output, production build and the real HTTP integration test pass. Browser workflow verification remains to be run after the updated source is available to the deployment pipeline.
+- Handoff: upload this iteration to `kidultlori-beep/guesswhat`, verify the Render migration against the persistent database, add and verify `draw.annieway.world`, then update `DRAWSTACKS_PUBLIC_URL`. Keep `seefon.com` available until the new hostname is confirmed.
+
 ## 2026-09-13 — GitHub synchronization restored
 
 - Uploaded gameplay commit `19304da` and X-sharing commit `6145896` to `main`. Git required the existing Windows system proxy; the proxy override was applied only to the upload command, with no permanent Git or system configuration changes.

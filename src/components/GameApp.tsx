@@ -734,7 +734,7 @@ function GuessPanel({
   const latest = data.floors.at(-1)!,
     own = user?.id === latest.authorId,
     unlocked = !!data.word,
-    wrong = data.guesses.filter((g) => !g.correct);
+    wrong = data.guesses;
   return (
     <aside className="guess-panel panel">
       {unlocked ? (
@@ -793,6 +793,7 @@ function GuessPanel({
             Guess the latest drawing. Match any answer its artist set to win the
             next drawing turn.
           </p>
+          {latest.hint && <p className="hint">Hint: “{latest.hint}”</p>}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -843,11 +844,13 @@ function GuessPanel({
       )}
       {wrong.length > 0 && (
         <div className="guess-history">
-          <h3>Your guesses</h3>
-          {wrong.slice(0, 8).map((g) => (
-            <p key={g.text}>
+          <h3>Wrong guesses</h3>
+          {wrong.slice(0, 12).map((g, index) => (
+            <p key={`${g.author}-${g.text}-${index}`}>
               <XCircle size={19} />
-              <span>{g.text}</span>
+              <span>
+                <strong>{g.author}</strong> guessed “{g.text}”
+              </span>
               <small>Not quite</small>
             </p>
           ))}

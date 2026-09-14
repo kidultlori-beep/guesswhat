@@ -32,6 +32,7 @@ function setup(t: TestContext) {
     c = game.identify("Charlie");
   const s = game.publish(a.user.id, {
     word: "bicycle,bike",
+    hint: "It has two wheels.",
     image: picture,
     key: "initial-0001",
   });
@@ -105,6 +106,7 @@ test("a correct answer reveals that floor, creates a public event and notifies i
   const { game, a, b, c } = setup(t);
   const s = game.publish(a.user.id, {
     word: " ELON   MUSK,马斯克,elon musk ",
+    hint: "A famous technology founder.",
     image: picture,
     key: "custom-answers-1",
   });
@@ -125,6 +127,7 @@ test("a correct answer reveals that floor, creates a public event and notifies i
     b.user.id,
     {
       word: "SPACE X,太空探索技术公司",
+      hint: "A private space company.",
       image: picture,
       key: "custom-relay-1",
       parent: s.floor,
@@ -149,6 +152,7 @@ test("a correct answer reveals that floor, creates a public event and notifies i
     () =>
       game.publish(a.user.id, {
         word: "a,,b",
+        hint: "An invalid answer test.",
         image: picture,
         key: "invalid-custom-1",
       }),
@@ -173,12 +177,13 @@ test("existing single-answer stacks work without a migration or automatic aliase
   assert.equal(game.guess(b.user.id, s.id, "BICYCLE").correct, true);
   const other = game.publish(c.user.id, {
     word: "bicycle",
+    hint: "It has two wheels.",
     image: picture,
     key: "legacy-single-2",
   });
   assert.equal(game.guess(b.user.id, other.id, "bike").correct, false);
 });
-test("answer and other players guesses never leak to unsolved viewers", (t) => {
+test("answers stay private while wrong guesses and hints are public", (t) => {
   const { game, a, b, c, s } = setup(t);
   game.guess(b.user.id, s.id, "scooter");
   const publicData = JSON.stringify({
@@ -188,11 +193,40 @@ test("answer and other players guesses never leak to unsolved viewers", (t) => {
     floors: game.contributions(a.user.id),
   });
   assert(!publicData.includes("bicycle"));
-  assert(!publicData.includes("scooter"));
+  assert(publicData.includes("scooter"));
+  assert(publicData.includes("Bob"));
+  assert(publicData.includes("It has two wheels."));
   assert(!publicData.includes(a.token!));
+  assert.deepEqual(game.detail(s.id).guesses[0], {
+    text: "scooter",
+    correct: false,
+    author: "Bob",
+  });
   assert.equal(game.detail(s.id, b.user.id).word, null);
   assert.equal(game.detail(s.id, a.user.id).word, "bicycle,bike");
   assert.throws(() => game.comments(b.user.id, s.floor), status(403));
+});
+test("new floors require a concise public hint", (t) => {
+  const { game, a } = setup(t);
+  assert.throws(
+    () =>
+      game.publish(a.user.id, {
+        word: "cat",
+        image: picture,
+        key: "missing-hint-1",
+      }),
+    status(400),
+  );
+  assert.throws(
+    () =>
+      game.publish(a.user.id, {
+        word: "cat",
+        hint: "x".repeat(161),
+        image: picture,
+        key: "long-hint-001",
+      }),
+    status(400),
+  );
 });
 test("tries decrement once, normalize duplicates, refill on server time, correct is free", (t) => {
   const { game, b, s, advance } = setup(t);
@@ -223,7 +257,13 @@ test("relay requires solving latest floor, new answers, and supports alternating
     () =>
       game.publish(
         b.user.id,
-        { image: picture, word: "cat", key: "unsolved-01", parent: s.floor },
+        {
+          image: picture,
+          word: "cat",
+          hint: "It purrs.",
+          key: "unsolved-01",
+          parent: s.floor,
+        },
         s.id,
       ),
     status(403),
@@ -231,7 +271,13 @@ test("relay requires solving latest floor, new answers, and supports alternating
   game.guess(b.user.id, s.id, "bike");
   const second = game.publish(
     b.user.id,
-    { image: picture, word: "cat,kitty", key: "second-0001", parent: s.floor },
+    {
+      image: picture,
+      word: "cat,kitty",
+      hint: "It purrs.",
+      key: "second-0001",
+      parent: s.floor,
+    },
     s.id,
   );
   assert.deepEqual(
@@ -245,6 +291,7 @@ test("relay requires solving latest floor, new answers, and supports alternating
         {
           image: picture,
           word: "dog",
+          hint: "A loyal pet.",
           key: "second-0002",
           parent: second.floor,
         },
@@ -256,7 +303,13 @@ test("relay requires solving latest floor, new answers, and supports alternating
     () =>
       game.publish(
         c.user.id,
-        { image: picture, word: "dog", key: "third-0001", parent: s.floor },
+        {
+          image: picture,
+          word: "dog",
+          hint: "A loyal pet.",
+          key: "third-0001",
+          parent: s.floor,
+        },
         s.id,
       ),
     status(403),
@@ -267,6 +320,7 @@ test("relay requires solving latest floor, new answers, and supports alternating
     {
       image: picture,
       word: "dog,puppy",
+      hint: "A loyal pet.",
       key: "third-0001",
       parent: second.floor,
     },
@@ -275,7 +329,13 @@ test("relay requires solving latest floor, new answers, and supports alternating
   game.guess(a.user.id, s.id, "puppy");
   game.publish(
     a.user.id,
-    { image: picture, word: "moon", key: "fourth-0001", parent: third.floor },
+    {
+      image: picture,
+      word: "moon",
+      hint: "It shines at night.",
+      key: "fourth-0001",
+      parent: third.floor,
+    },
     s.id,
   );
   assert.equal(game.detail(s.id).floors.length, 4);
@@ -287,6 +347,7 @@ test("blank, malformed, wrong-size images rejected and no orphan stacks created"
     () =>
       game.publish(a.user.id, {
         word: "cat",
+        hint: "It purrs.",
         key: "blank-0001",
         image: drawing(true),
       }),
@@ -296,6 +357,7 @@ test("blank, malformed, wrong-size images rejected and no orphan stacks created"
     () =>
       game.publish(a.user.id, {
         word: "cat",
+        hint: "It purrs.",
         key: "invalid-01",
         image: "data:image/png;base64,abc",
       }),
@@ -305,6 +367,7 @@ test("blank, malformed, wrong-size images rejected and no orphan stacks created"
     () =>
       game.publish(a.user.id, {
         word: " , ",
+        hint: "An invalid answer test.",
         key: "invalid-02",
         image: picture,
       }),
@@ -399,6 +462,7 @@ test("ranking ties use earlier most-recent counted activity", (t) => {
   advance(100);
   const tie = game.publish(a.user.id, {
     word: "cat",
+    hint: "It purrs.",
     image: picture,
     key: "ranking-tie-2",
   });
@@ -406,6 +470,7 @@ test("ranking ties use earlier most-recent counted activity", (t) => {
   assert.equal(game.rankings("guessers").rows[0].id, b.user.id);
   const other = game.publish(c.user.id, {
     word: "cat",
+    hint: "It purrs.",
     image: picture,
     key: "other-0001",
   });
@@ -435,6 +500,7 @@ test("server restart preserves drawings, identity, guesses and statistics", () =
     const s = game.publish(a.user.id, {
       image: picture,
       word: "ELON MUSK,马斯克",
+      hint: "A famous technology founder.",
       key: "persistent-1",
     });
     game.guess(b.user.id, s.id, "马斯克");
@@ -500,6 +566,7 @@ test("legacy stack database migrates answers per floor and allows artists to ret
       "b",
       {
         word: "dog,狗",
+        hint: "A loyal pet.",
         image: picture,
         key: "legacy-next-1",
         parent: "floor-1",
@@ -511,6 +578,7 @@ test("legacy stack database migrates answers per floor and allows artists to ret
       "a",
       {
         word: "moon,月亮",
+        hint: "It shines at night.",
         image: picture,
         key: "legacy-return-1",
         parent: second.floor,

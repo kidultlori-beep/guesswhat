@@ -96,7 +96,12 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   const created = await call(
     "stacks",
     "POST",
-    { word: " ELON MUSK,马斯克,elon musk ", key: "http-create-1", image },
+    {
+      word: " ELON MUSK,马斯克,elon musk ",
+      hint: "A technology founder.",
+      key: "http-create-1",
+      image,
+    },
     a.cookie,
   );
   assert.equal(created.status, 201);
@@ -106,6 +111,7 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   assert.equal(publicView.word, null);
   assert.equal(publicView.floors.length, 1);
   assert.equal(publicView.creator, "HTTP Alice");
+  assert.equal(publicView.floors[0].hint, "A technology founder.");
   const img = await call(`floors/${s.floor}/image`);
   assert.equal(img.status, 200);
   assert.equal(img.headers.get("content-type"), "image/png");
@@ -143,10 +149,12 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   assert.equal(wrong.correct, false);
   assert.equal(wrong.state.remaining, 4);
   assert.equal(wrong.state.word, null);
+  assert.equal(wrong.state.guesses[0].text, "car");
+  assert.equal(wrong.state.guesses[0].author, "HTTP Bob");
   const own = await (
     await call(`stacks/${s.id}`, "GET", undefined, a.cookie)
   ).json();
-  assert.equal(own.guesses.length, 0);
+  assert.equal(own.guesses[0].text, "car");
   assert.equal(own.word, "ELON MUSK,马斯克");
   const solve = await (
     await call(`stacks/${s.id}/guess`, "POST", { guess: "马斯克" }, b.cookie)
@@ -171,7 +179,12 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
       await call(
         "stacks",
         "POST",
-        { word: "bad,,answer", key: "http-invalid-answer", image },
+        {
+          word: "bad,,answer",
+          hint: "Invalid answers.",
+          key: "http-invalid-answer",
+          image,
+        },
         a.cookie,
       )
     ).status,
@@ -221,7 +234,13 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   const relay = await call(
     `stacks/${s.id}/draw`,
     "POST",
-    { image, word: "rocket,火箭", parent: s.floor, key: "http-relay-1" },
+    {
+      image,
+      word: "rocket,火箭",
+      hint: "It launches into space.",
+      parent: s.floor,
+      key: "http-relay-1",
+    },
     b.cookie,
   );
   assert.equal(relay.status, 201);

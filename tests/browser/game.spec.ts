@@ -87,7 +87,9 @@ test("custom answer editor validates separators and preserves unfinished input",
   await identify(context, "Answer editor");
   await page.goto("/new");
   const field = page.getByLabel("Accepted answers", { exact: true });
+  const hint = page.getByLabel("One-sentence hint", { exact: true });
   await field.fill("ELON MUSK,马斯克");
+  await hint.fill("A famous technology founder.");
   await page.reload();
   await expect(field).toHaveValue("ELON MUSK,马斯克");
   await field.fill("ELON MUSK，马斯克");
@@ -120,6 +122,9 @@ test("two players create, guess, relay, socialize, share and rank; real desktop/
   await page
     .getByLabel("Accepted answers", { exact: true })
     .fill("UMBRELLA,雨伞");
+  await page
+    .getByLabel("One-sentence hint", { exact: true })
+    .fill("You might use this on a rainy day.");
   await page.getByRole("button", { name: "Save answers & draw" }).click();
   await page
     .getByRole("button", { name: "Publish stack", exact: true })
@@ -162,6 +167,7 @@ test("two players create, guess, relay, socialize, share and rank; real desktop/
   await player.getByRole("button", { name: "Let’s play" }).click();
   await expect(player.getByText("4 / 5 tries left")).toBeVisible();
   await expect(player.locator(".guess-history")).toContainText("not the word");
+  await expect(page.locator(".guess-history")).toContainText("not the word");
   await player.screenshot({
     path: "test-results/qa/detail-wrong-desktop.png",
     fullPage: true,
@@ -192,6 +198,9 @@ test("two players create, guess, relay, socialize, share and rank; real desktop/
   await player
     .getByLabel("Accepted answers", { exact: true })
     .fill("ROCKET,火箭");
+  await player
+    .getByLabel("One-sentence hint", { exact: true })
+    .fill("It launches into space.");
   await player.getByRole("button", { name: "Save answers & draw" }).click();
   await drawUmbrella(player);
   await player
@@ -269,6 +278,9 @@ test("two players create, guess, relay, socialize, share and rank; real desktop/
   await page
     .getByLabel("Accepted answers", { exact: true })
     .fill("ELON MUSK,马斯克");
+  await page
+    .getByLabel("One-sentence hint", { exact: true })
+    .fill("A famous technology founder.");
   await page.getByRole("button", { name: "Save answers & draw" }).click();
   await expect(page.getByLabel("Drawing canvas")).toBeVisible();
   await page.screenshot({
@@ -292,6 +304,9 @@ test("editor supports erase, shapes, fill, selection, undo/redo, clear and zoom"
   await page
     .getByLabel("Accepted answers", { exact: true })
     .fill("custom subject");
+  await page
+    .getByLabel("One-sentence hint", { exact: true })
+    .fill("A custom subject for painting tools.");
   await page.getByRole("button", { name: "Save answers & draw" }).click();
   const blank = await canvasData(page);
   await stroke(page, [

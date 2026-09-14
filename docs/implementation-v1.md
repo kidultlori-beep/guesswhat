@@ -12,8 +12,8 @@ No sample stacks are inserted on normal startup. All test state is isolated. Sel
 | --- | --- |
 | users | Public UUID, nickname, hashed private session token, expiration |
 | stacks | Neutral sequential public number, opaque UUID, founder, times; legacy `word` mirrors Floor 1 for compatibility |
-| floors | Validated original/preview PNGs, artist, stack, ordered index and that floor's private comma-separated answers; unique index/stack |
-| floor_guesses | Floor-scoped private normalized guesses; one first correct solve per floor |
+| floors | Validated original/preview PNGs, artist, stack, ordered index, private comma-separated answers and a public hint; unique index/stack |
+| floor_guesses | Floor-scoped normalized guesses; wrong guesses are public, while the one correct solve reveals only after success |
 | floor_meters | Remaining attempts and server-time recovery anchor per player/floor |
 | notifications | Correct-solve alerts for the drawing artist, including read state |
 | likes | Unique player/floor, original event time; self-like rejected |
@@ -30,9 +30,9 @@ Mutations need `X-DrawStacks: 1`; browser Origin must match Host. The session co
 | --- | --- | --- |
 | GET / PUT | `/api/me` | Current identity / choose or update nickname |
 | GET / POST | `/api/stacks` | Twelve public stack summaries (offset pagination) / publish a new stack |
-| GET | `/api/stacks/:id` | Public floors plus requester state for the latest floor; answers appear only to its artist/solver or after reveal |
+| GET | `/api/stacks/:id` | Public floors, hint and wrong-guess list plus requester state; answers appear only to the artist/solver or after reveal |
 | POST | `/api/stacks/:id/guess` | Correct/duplicate flags plus fresh requester-specific state |
-| POST | `/api/stacks/:id/draw` | Winner publishes relay with `parent`, new `word` answers, `image`, `key` |
+| POST | `/api/stacks/:id/draw` | Winner publishes relay with `parent`, new `word` answers, public `hint`, `image`, `key` |
 | GET | `/api/floors/:id/image?preview=1` | Immutable PNG thumbnail; omit query for original |
 | GET | `/api/share-card/:floorId` | Public spoiler-free 1200 × 630 social preview PNG |
 | PUT | `/api/floors/:id/like` | Set explicit boolean `liked`, safe to retry |
@@ -46,13 +46,13 @@ Client errors use `{error: "readable message"}`. Expected statuses: 400 invalid 
 
 ### Custom accepted answers (supersedes the word bank)
 
-`POST /api/stacks` retains the compatible `word` field but now accepts user-written English-comma-separated answers, e.g. `ELON MUSK,马斯克`. `src/lib/answers.ts` shares validation between browser and server: 1–10 distinct entries, 80 characters per entry, 809 input characters total; trim/collapse whitespace, NFC normalization and case-insensitive deduplication while preserving first-entry spelling. Empty entries, full-width comma separators and control characters are rejected with English messages. `/api/words` is removed (404); there are no built-in aliases or suggestions.
+`POST /api/stacks` retains the compatible `word` field and accepts user-written English-comma-separated answers, e.g. `ELON MUSK,马斯克`. Every new floor also requires a public `hint` of 1–160 characters. `src/lib/answers.ts` shares answer validation between browser and server: 1–10 distinct entries, 80 characters per entry, 809 input characters total; trim/collapse whitespace, NFC normalization and case-insensitive deduplication while preserving first-entry spelling. Empty entries, full-width comma separators and control characters are rejected with English messages. `/api/words` is removed (404); there are no built-in aliases or suggestions.
 
-Guesses must match one complete normalized entry; do not split a submitted guess into multiple guesses or accept substrings. Each floor owns its answer list. Server response `word` describes only the latest floor and is null for unsolved viewers other than its artist; revealed floor rows expose their own `answers`. The first correct guess atomically locks the right to publish the next floor, reveals the accepted answers, creates a public solve event and alerts the artist. Further guesses against that solved floor are rejected while the winner draws.
+Guesses must match one complete normalized entry; do not split a submitted guess into multiple guesses or accept substrings. Each floor owns its answer list and public hint. Server response `word` describes only the latest floor and is null for unsolved viewers other than its artist; revealed floor rows expose their own `answers`. Incorrect guesses return publicly with the guesser's nickname so the group can see what has already been tried. Correct guesses never appear before the solve reveal. The first correct guess atomically locks the right to publish the next floor, reveals the accepted answers, creates a public solve event and alerts the artist. Further guesses against that solved floor are rejected while the winner draws.
 
-The startup migration adds per-floor answers, guesses, attempt meters and notifications, copies each legacy stack answer to its existing floors, and removes the former unique artist/stack restriction. Legacy solve/attempt tables remain for compatibility and are migrated without deleting player data. This permits A → B → C → A relays while keeping unique floor order and stale-parent checks.
+The startup migration adds per-floor answers, public hints, guesses, attempt meters and notifications, copies each legacy stack answer to its existing floors, and removes the former unique artist/stack restriction. Existing floors receive an empty hint and remain readable; every new publication requires one. Legacy solve/attempt tables remain for compatibility and are migrated without deleting player data. This permits A → B → C → A relays while keeping unique floor order and stale-parent checks.
 
-Drafts retain the compatible `word` field and add `answerInput` for unfinished edits; older drafts without the extra field still restore. All interface copy remains English, including validation; user-entered answers can use other languages. Never include private answer lists in public titles, previews, lists, rankings or share text.
+Drafts retain the compatible `word` field and add `answerInput` plus `hint` for unfinished edits; older drafts restore and prompt for the now-required hint. All interface copy remains English, including validation; user-entered answers and hints can use other languages. Never include private answer lists in public titles, previews, lists, rankings or share text.
 
 ### Social sharing
 

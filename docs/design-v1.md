@@ -21,15 +21,15 @@ The attached Neal.fun screenshot is a visual reference only. Use original DrawSt
 
 These are four screens of one design, not alternatives. Mockup counts are illustrative and are not real activity. The specifications below govern behavior when image details differ.
 
-Latest user revision: every floor's artist writes a private comma-separated accepted-answer list for that floor. All UI labels remain English; player answers can be multilingual. A correct solve publishes the winning guess and artist's complete answer list, notifies the artist, and gives the winner the next drawing opportunity.
+Latest user revision: every floor's artist writes a private comma-separated accepted-answer list and a one-sentence public hint for that floor. All UI labels remain English; player content can be multilingual. Everyone can see the current floor's wrong guesses and player nicknames. A correct solve publishes the winning guess and artist's complete answer list, notifies the artist, and gives the winner the next drawing opportunity.
 
 ## Core loop and rules
 
 1. Browse stacks without creating an account. Before guessing, drawing, liking or commenting, choose a nickname in a small dialog. Return to the interrupted action afterward.
-2. Start a stack: write your own accepted answers, separated by English commas, then draw the first floor. Words, phrases and translations in any language are allowed, e.g. `ELON MUSK,马斯克`. There is no word bank or suggestion refresh.
+2. Start a stack: write your own accepted answers, separated by English commas, add a one-sentence public hint, then draw the first floor. Words, phrases, translations and hints in any language are allowed, e.g. `ELON MUSK,马斯克`. There is no word bank or suggestion refresh.
 3. Publish: create both the stack and Floor 1 together. A draft does not appear on the homepage.
 4. Visit a stack: open the latest floor, with access to earlier floors. Each floor is a new prompt with its own private answer list.
-5. Incorrect guess: show a coral cross, `Not quite! Try again.`, reduce the remaining attempts by one, and retain the guess in the player's private history.
+5. Incorrect guess: show a coral cross, `Not quite! Try again.`, reduce the remaining attempts by one, and add the guess plus player nickname to the public wrong-guess list.
 6. Correct guess: the first solver wins the next drawing opportunity. Reveal the solved drawing, exact winning guess and full accepted-answer list in a public activity card, notify its artist, and show `Draw the next floor` to the winner.
 7. Relay: the winner must enter new accepted answers before drawing. The previous floor remains a collapsible reference. Publishing adds the new private prompt and returns everyone to the latest floor.
 
@@ -61,8 +61,8 @@ The desktop page places floor navigation and the drawing to the left, with guess
 
 | Viewer state | Visible controls and feedback |
 | --- | --- |
-| Guest, unsolved | Input, Guess, remaining attempts, own history; answers hidden |
-| Incorrect | Coral cross and text, consumed dot faded; own wrong guess remains visible |
+| Guest, unsolved | Public hint, input, Guess, remaining attempts and group wrong-guess list; answers hidden |
+| Incorrect | Coral cross and text, consumed dot faded; wrong guess and nickname remain visible to everyone |
 | No attempts | Disabled submit, recovery countdown, `Explore other stacks`; input text preserved |
 | Correct, eligible | Green confirmation, revealed answers, `Draw the next floor` |
 | Current artist | Private accepted answers; `Waiting for a guess`; no self-guess |
@@ -73,7 +73,7 @@ The initial implementation should show errors persistently until the next attemp
 
 ## Drawing editor
 
-Use the same editor for opening and relaying. Both flows begin with a blank private `Accepted answers` form. The English-labeled input explains comma-separated alternatives, and `Save answers & draw` validates them before drawing. A relay also shows the previous floor reference toggle, but never copies its answers. Unfinished input is included in local drafts. Drawing itself occupies most of the workspace.
+Use the same editor for opening and relaying. Both flows begin with a blank private `Accepted answers` form and a required public one-sentence hint. The English-labeled inputs explain comma-separated alternatives and spoiler-safe hints; `Save answers & draw` validates both before drawing. A relay also shows the previous floor reference toggle, but never copies its answers or hint. Unfinished input is included in local drafts. Drawing itself occupies most of the workspace.
 
 | Tool / setting | First-version behavior |
 | --- | --- |

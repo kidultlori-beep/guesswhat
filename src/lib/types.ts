@@ -23,6 +23,7 @@ export interface Floor {
   likes: number;
   liked: boolean;
   comments: number;
+  hint: string;
   answers: string | null;
   revealed: boolean;
   solves: number;
@@ -42,9 +43,10 @@ export interface StackDetail {
   remaining: number;
   resetAt: number | null;
   now: number;
-  guesses: { text: string; correct: boolean }[];
+  guesses: { text: string; correct: false; author: string }[];
   targetFloorId: string;
 }
+export const MAX_HINT_LENGTH = 160;
 export interface Comment {
   id: string;
   author: string;

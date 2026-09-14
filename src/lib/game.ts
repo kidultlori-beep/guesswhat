@@ -10,6 +10,7 @@ import {
   normalize,
   MAX_ANSWER_LENGTH,
 } from "./answers";
+import { MAX_HINT_LENGTH } from "./types";
 import type {
   User,
   StackDetail,
@@ -63,7 +64,7 @@ export class Game {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY, nickname TEXT NOT NULL, session_hash TEXT UNIQUE NOT NULL, expires INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS stacks(number INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE NOT NULL, word TEXT NOT NULL, creator_id TEXT NOT NULL REFERENCES users(id), created INTEGER NOT NULL, updated INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS floors(id TEXT PRIMARY KEY, stack_id TEXT NOT NULL REFERENCES stacks(id), author_id TEXT NOT NULL REFERENCES users(id), floor_index INTEGER NOT NULL, image BLOB NOT NULL, preview BLOB NOT NULL, created INTEGER NOT NULL, answers TEXT, UNIQUE(stack_id, floor_index));
+      CREATE TABLE IF NOT EXISTS floors(id TEXT PRIMARY KEY, stack_id TEXT NOT NULL REFERENCES stacks(id), author_id TEXT NOT NULL REFERENCES users(id), floor_index INTEGER NOT NULL, image BLOB NOT NULL, preview BLOB NOT NULL, created INTEGER NOT NULL, answers TEXT, hint TEXT NOT NULL DEFAULT '', UNIQUE(stack_id, floor_index));
       CREATE TABLE IF NOT EXISTS guesses(id INTEGER PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), stack_id TEXT NOT NULL REFERENCES stacks(id), text TEXT NOT NULL, correct INTEGER NOT NULL, created INTEGER NOT NULL, UNIQUE(user_id,stack_id,text));
       CREATE UNIQUE INDEX IF NOT EXISTS one_solve ON guesses(user_id,stack_id) WHERE correct=1;
       CREATE TABLE IF NOT EXISTS meters(user_id TEXT NOT NULL REFERENCES users(id), stack_id TEXT NOT NULL REFERENCES stacks(id), remaining INTEGER NOT NULL, anchor INTEGER NOT NULL, PRIMARY KEY(user_id,stack_id));
@@ -87,6 +88,11 @@ export class Game {
         "UPDATE floors SET answers=(SELECT word FROM stacks WHERE stacks.id=floors.stack_id) WHERE answers IS NULL",
       );
     }
+    if (!floorColumns.some((column) => column.name === "hint")) {
+      this.db.exec(
+        "ALTER TABLE floors ADD COLUMN hint TEXT NOT NULL DEFAULT ''",
+      );
+    }
     const floorSchema = (
       this.db
         .prepare(
@@ -97,8 +103,8 @@ export class Game {
     if (/UNIQUE\s*\(\s*stack_id\s*,\s*author_id\s*\)/i.test(floorSchema)) {
       this.db.exec("PRAGMA foreign_keys=OFF");
       this.db.exec(`BEGIN IMMEDIATE;
-        CREATE TABLE floors_new(id TEXT PRIMARY KEY,stack_id TEXT NOT NULL REFERENCES stacks(id),author_id TEXT NOT NULL REFERENCES users(id),floor_index INTEGER NOT NULL,image BLOB NOT NULL,preview BLOB NOT NULL,created INTEGER NOT NULL,answers TEXT,UNIQUE(stack_id,floor_index));
-        INSERT INTO floors_new(id,stack_id,author_id,floor_index,image,preview,created,answers) SELECT id,stack_id,author_id,floor_index,image,preview,created,answers FROM floors;
+        CREATE TABLE floors_new(id TEXT PRIMARY KEY,stack_id TEXT NOT NULL REFERENCES stacks(id),author_id TEXT NOT NULL REFERENCES users(id),floor_index INTEGER NOT NULL,image BLOB NOT NULL,preview BLOB NOT NULL,created INTEGER NOT NULL,answers TEXT,hint TEXT NOT NULL DEFAULT '',UNIQUE(stack_id,floor_index));
+        INSERT INTO floors_new(id,stack_id,author_id,floor_index,image,preview,created,answers,hint) SELECT id,stack_id,author_id,floor_index,image,preview,created,answers,hint FROM floors;
         DROP TABLE floors; ALTER TABLE floors_new RENAME TO floors; COMMIT;`);
       this.db.exec("PRAGMA foreign_keys=ON");
     }
@@ -229,7 +235,7 @@ export class Game {
       contributed = this.contributed(uid, id);
     const floors = this.db
       .prepare(
-        `SELECT f.id,f.floor_index AS 'index',f.author_id authorId,u.nickname author,f.created,
+        `SELECT f.id,f.floor_index AS 'index',f.author_id authorId,u.nickname author,f.created,f.hint,
       (SELECT COUNT(*) FROM likes WHERE floor_id=f.id) likes,
       EXISTS(SELECT 1 FROM likes WHERE floor_id=f.id AND user_id=?) liked,
       (SELECT COUNT(*) FROM comments WHERE floor_id=f.id)+(SELECT COUNT(*) FROM floor_guesses WHERE floor_id=f.id AND correct=1) comments,
@@ -244,16 +250,17 @@ export class Game {
         .prepare("SELECT nickname FROM users WHERE id=?")
         .get(s.creator_id) as { nickname: string }
     ).nickname;
-    const guesses = uid
-      ? (this.db
-          .prepare(
-            "SELECT text,correct FROM floor_guesses WHERE floor_id=? AND user_id=? ORDER BY id DESC LIMIT 50",
-          )
-          .all(target.id, uid) as unknown as {
-          text: string;
-          correct: boolean;
-        }[])
-      : [];
+    const guesses = this.db
+      .prepare(
+        `SELECT g.text,0 correct,u.nickname author
+         FROM floor_guesses g JOIN users u ON u.id=g.user_id
+         WHERE g.floor_id=? AND g.correct=0 ORDER BY g.id DESC LIMIT 50`,
+      )
+      .all(target.id) as unknown as {
+      text: string;
+      correct: number;
+      author: string;
+    }[];
     const meter = this.meter(uid, target.id);
     const revealed = !!this.db
       .prepare("SELECT 1 FROM floor_guesses WHERE floor_id=? AND correct=1")
@@ -276,7 +283,10 @@ export class Game {
       remaining: meter.remaining,
       resetAt: meter.resetAt,
       now: this.now(),
-      guesses: guesses.map((g) => ({ ...g, correct: !!g.correct })),
+      guesses: guesses.map((guess) => ({
+        ...guess,
+        correct: false as const,
+      })),
       targetFloorId: target.id,
     };
   }
@@ -322,7 +332,13 @@ export class Game {
   }
   publish(
     uid: string,
-    input: { word?: unknown; image?: unknown; key?: unknown; parent?: unknown },
+    input: {
+      word?: unknown;
+      hint?: unknown;
+      image?: unknown;
+      key?: unknown;
+      parent?: unknown;
+    },
     stackId?: string,
   ) {
     const key = text(input.key, 8, 100);
@@ -367,6 +383,7 @@ export class Game {
       } catch (error) {
         return fail(400, (error as Error).message);
       }
+      const hint = text(input.hint, 1, MAX_HINT_LENGTH);
       if (!id) {
         id = randomUUID();
         this.db
@@ -378,7 +395,7 @@ export class Game {
       const floor = randomUUID();
       this.db
         .prepare(
-          "INSERT INTO floors(id,stack_id,author_id,floor_index,image,preview,created,answers) VALUES(?,?,?,?,?,?,?,?)",
+          "INSERT INTO floors(id,stack_id,author_id,floor_index,image,preview,created,answers,hint) VALUES(?,?,?,?,?,?,?,?,?)",
         )
         .run(
           floor,
@@ -389,6 +406,7 @@ export class Game {
           pixels.preview,
           this.now(),
           answers,
+          hint,
         );
       this.db
         .prepare("UPDATE stacks SET updated=? WHERE id=?")

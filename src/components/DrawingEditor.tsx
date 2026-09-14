@@ -27,7 +27,7 @@ import {
 import { floodFill } from "@/lib/paint";
 import { parseAnswers, MAX_ANSWERS_INPUT_LENGTH } from "@/lib/answers";
 import { api, draftKey, freshKey, errorMessage, imageUrl } from "@/lib/client";
-import type { StackDetail, User } from "@/lib/types";
+import { MAX_HINT_LENGTH, type StackDetail, type User } from "@/lib/types";
 
 type Tool =
   | "pencil"
@@ -45,6 +45,7 @@ type Draft = {
   image: string;
   word: string;
   answerInput?: string;
+  hint?: string;
   key: string;
   parent?: string;
 };
@@ -102,6 +103,8 @@ export default function DrawingEditor({
   const [word, setWord] = useState(""),
     [answerInput, setAnswerInput] = useState(""),
     [answerError, setAnswerError] = useState(""),
+    [hint, setHint] = useState(""),
+    [hintError, setHintError] = useState(""),
     [choosing, setChoosing] = useState(true);
   const [reference, setReference] = useState(stack?.floors.at(-1)),
     [showReference, setShowReference] = useState(false);
@@ -120,6 +123,7 @@ export default function DrawingEditor({
     storageKey = draftKey(user.id, stack?.id),
     wordRef = useRef(word),
     answerInputRef = useRef(answerInput),
+    hintRef = useRef(hint),
     space = useRef(false),
     modified = useRef(false);
   const stroke = useRef<{
@@ -151,6 +155,7 @@ export default function DrawingEditor({
           image: canvas.current.toDataURL(),
           word: wordRef.current,
           answerInput: answerInputRef.current,
+          hint: hintRef.current,
           key: key.current,
           parent: parent.current,
         }),
@@ -232,8 +237,12 @@ export default function DrawingEditor({
           ? draft.answerInput
           : wordRef.current;
       setAnswerInput(answerInputRef.current);
+      hintRef.current = typeof draft.hint === "string" ? draft.hint : "";
+      setHint(hintRef.current);
       setChoosing(
-        !wordRef.current || answerInputRef.current !== wordRef.current,
+        !wordRef.current ||
+          !hintRef.current ||
+          answerInputRef.current !== wordRef.current,
       );
       key.current = draft.key || key.current;
       parent.current = draft.parent || parent.current;
@@ -497,11 +506,19 @@ export default function DrawingEditor({
       setAnswerError(errorMessage(e));
       return;
     }
+    const cleanHint = hint.trim();
+    if (!cleanHint) {
+      setHintError("Write one sentence to help other players guess.");
+      return;
+    }
     setWord(value);
     wordRef.current = value;
     setAnswerInput(value);
     answerInputRef.current = value;
     setAnswerError("");
+    setHint(cleanHint);
+    hintRef.current = cleanHint;
+    setHintError("");
     setChoosing(false);
     save();
   }
@@ -513,7 +530,7 @@ export default function DrawingEditor({
       );
   }
   async function publish() {
-    if (!word || busy || !canvas.current) return;
+    if (!word || !hint || busy || !canvas.current) return;
     save();
     setBusy(true);
     setError("");
@@ -523,6 +540,7 @@ export default function DrawingEditor({
         "POST",
         {
           word,
+          hint,
           image: canvas.current.toDataURL(),
           key: key.current,
           parent: parent.current,
@@ -569,7 +587,7 @@ export default function DrawingEditor({
           </h1>
         </div>
         <p className="steps">
-          <span className="step">1</span> Set answers{" "}
+          <span className="step">1</span> Set answers & hint{" "}
           <span className="step">2</span> Draw it
         </p>
       </div>
@@ -584,6 +602,7 @@ export default function DrawingEditor({
           )}
         </div>
         <p>Only you can see this. Draw it without letters.</p>
+        {hint && <p>Public hint: “{hint}”</p>}
       </div>
       {reference && (
         <div className="reference-floor">
@@ -638,6 +657,30 @@ export default function DrawingEditor({
               answer wins. Any language is welcome; capitalization does not
               matter. Up to 10 answers, 80 characters each.
             </small>
+            <label htmlFor="answer-hint">One-sentence hint</label>
+            <textarea
+              id="answer-hint"
+              placeholder="e.g. You might see this on a rainy day."
+              rows={2}
+              maxLength={MAX_HINT_LENGTH}
+              value={hint}
+              aria-describedby="hint-help"
+              aria-invalid={!!hintError}
+              onChange={(e) => {
+                setHint(e.target.value);
+                hintRef.current = e.target.value;
+                setHintError("");
+                save();
+              }}
+            />
+            <small id="hint-help">
+              This hint is public. Help players without giving the answer away.
+            </small>
+            {hintError && (
+              <p className="error-text" role="alert">
+                {hintError}
+              </p>
+            )}
             {answerError && (
               <p className="error-text" role="alert">
                 {answerError}
@@ -645,7 +688,7 @@ export default function DrawingEditor({
             )}
             <button
               className="primary"
-              disabled={!ready || !answerInput.trim()}
+              disabled={!ready || !answerInput.trim() || !hint.trim()}
             >
               Save answers & draw <ArrowRight />
             </button>
@@ -935,7 +978,7 @@ export default function DrawingEditor({
         </span>
         <button
           className="primary"
-          disabled={busy || !ready || !word || choosing}
+          disabled={busy || !ready || !word || !hint || choosing}
           onClick={publish}
         >
           {busy ? "Publishing…" : stack ? "Publish floor" : "Publish stack"}
