@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-14 — X crawler compatibility hardening
+
+- Replaced the home Open Graph PNG with an opaque three-channel sRGB JPEG and declared `og:image:type` for both the home JPEG and dynamic floor PNG cards.
+- Raised home and floor share-card caching to `public, max-age=86400` with a seven-day stale-while-revalidate window.
+- Added a real generated `/robots.txt` that explicitly allows Twitterbot and all other crawlers.
+- Verification: generated JPEG metadata confirms 1200 × 630 sRGB with three channels and no alpha. Formatting, TypeScript, 19 unit/migration tests, the production build and the real HTTP integration test passed; HTTP coverage checks the JPEG MIME/cache headers, robots response, OG image types and the dynamic card cache header.
+- Handoff: deploy, verify the public response headers and metadata, then post a fresh `https://draw.annieway.world/?v=3` test link on X to force a new crawl.
+
 ## 2026-09-14 — Deployment-safe SQLite initialization
 
 - Deferred the shared `Game` and SQLite connection until the first API request. Render can now build a replacement release while the previous instance keeps the persistent database open.

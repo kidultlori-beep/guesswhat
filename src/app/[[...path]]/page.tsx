@@ -59,7 +59,15 @@ export async function generateMetadata({
       description,
       url: pageUrl,
       siteName: "DrawStacks",
-      images: [{ url: cardUrl, width: 1200, height: 630, alt: title }],
+      images: [
+        {
+          url: cardUrl,
+          width: 1200,
+          height: 630,
+          alt: title,
+          type: "image/png",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",

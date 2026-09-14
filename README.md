@@ -33,7 +33,7 @@ Enter 1–10 distinct accepted answers, each up to 80 characters (809 total inpu
 
 Likes attach to the selected drawing's artist, not the stack founder. Comments unlock when that drawing is solved (and remain privately available to its artist beforehand). Rankings count floors, correct floor solves, and current drawing likes. Home, open stacks, activity cards and the notification bell poll for new activity while the page is visible.
 
-Each floor has a normal Share action plus **Share on X**. Shared pages advertise a spoiler-free 1200 × 630 editorial card containing the drawing, stack/floor number and artist—but never answers or guesses. The home page has a separate static brand card, and SVG plus 32/96 px PNG favicons are supplied. X card crawlers need a publicly reachable HTTPS URL; `localhost` and private LAN addresses cannot produce public previews. The production deployment uses `DRAWSTACKS_PUBLIC_URL=https://draw.annieway.world` so canonical links and card URLs use the public origin.
+Each floor has a normal Share action plus **Share on X**. Shared pages advertise a spoiler-free 1200 × 630 editorial card containing the drawing, stack/floor number and artist—but never answers or guesses. The home page has a separate opaque RGB JPEG brand card, and SVG plus 32/96 px PNG favicons are supplied. Share images cache publicly for at least one day, Open Graph metadata declares their MIME type, and `/robots.txt` explicitly allows Twitterbot. X card crawlers need a publicly reachable HTTPS URL; `localhost` and private LAN addresses cannot produce public previews. The production deployment uses `DRAWSTACKS_PUBLIC_URL=https://draw.annieway.world` so canonical links and card URLs use the public origin.
 
 ## Drawing tools
 

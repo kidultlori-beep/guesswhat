@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { resolve } from "node:path";
 import { PNG } from "pngjs";
+import sharp from "sharp";
 let server: ChildProcess;
 const root = "http://127.0.0.1:3101";
 let output = "";
@@ -68,12 +69,13 @@ async function player(nickname: string) {
 test("real HTTP publication, permissions, private guesses, social actions, relay and images", async () => {
   const homeHtml = await (await fetch(root)).text();
   assert.match(homeHtml, /summary_large_image/);
-  assert.match(homeHtml, /\/og\/home\.png/);
+  assert.match(homeHtml, /\/og\/home\.jpg/);
+  assert.match(homeHtml, /image\/jpeg/);
   for (const asset of [
     ["/icon.svg", "image/svg+xml"],
     ["/icons/favicon-32.png", "image/png"],
     ["/icons/favicon-96.png", "image/png"],
-    ["/og/home.png", "image/png"],
+    ["/og/home.jpg", "image/jpeg"],
   ]) {
     const response = await fetch(`${root}${asset[0]}`);
     assert.equal(response.status, 200);
@@ -82,6 +84,21 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
       asset[1],
     );
   }
+  const homeCard = await fetch(`${root}/og/home.jpg`);
+  assert.match(homeCard.headers.get("cache-control") || "", /max-age=86400/);
+  const homeCardMetadata = await sharp(
+    Buffer.from(await homeCard.arrayBuffer()),
+  ).metadata();
+  assert.equal(homeCardMetadata.width, 1200);
+  assert.equal(homeCardMetadata.height, 630);
+  assert.equal(homeCardMetadata.space, "srgb");
+  assert.equal(homeCardMetadata.channels, 3);
+  const robots = await fetch(`${root}/robots.txt`);
+  assert.equal(robots.status, 200);
+  assert.match(robots.headers.get("content-type") || "", /^text\/plain/);
+  const robotsText = await robots.text();
+  assert.match(robotsText, /User-Agent: Twitterbot/i);
+  assert.match(robotsText, /Allow: \//);
   const a = await player("HTTP Alice"),
     b = await player("HTTP Bob");
   const png = new PNG({ width: 960, height: 640 });
@@ -145,6 +162,7 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
       `Share card returned ${shareCard.status}: ${await shareCard.text()}\nServer output:\n${output}`,
     );
   assert.match(shareCard.headers.get("content-type") || "", /^image\/png/);
+  assert.match(shareCard.headers.get("cache-control") || "", /max-age=86400/);
   const card = PNG.sync.read(Buffer.from(await shareCard.arrayBuffer()));
   assert.equal(card.width, 1200);
   assert.equal(card.height, 630);
@@ -154,6 +172,7 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   const sharedHtml = await sharedPage.text();
   assert.match(sharedHtml, /summary_large_image/);
   assert.ok(sharedHtml.includes(`/api/share-card/${s.floor}`));
+  assert.match(sharedHtml, /image\/png/);
   assert.equal(
     (await call(`floors/${s.floor}/comments`, "GET", undefined, b.cookie))
       .status,

@@ -19,14 +19,21 @@ export const metadata: Metadata = {
       "New answers and a new drawing on every floor. A collaborative drawing and guessing game.",
     url: "/",
     siteName: "DrawStacks",
-    images: [{ url: "/og/home.png", width: 1200, height: 630 }],
+    images: [
+      {
+        url: "/og/home.jpg",
+        width: 1200,
+        height: 630,
+        type: "image/jpeg",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "DrawStacks — Draw. Guess. Build together.",
     description:
       "New answers and a new drawing on every floor. A collaborative drawing and guessing game.",
-    images: ["/og/home.png"],
+    images: ["/og/home.jpg"],
   },
   icons: {
     icon: [
