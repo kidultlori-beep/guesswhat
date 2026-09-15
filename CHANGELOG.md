@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-15 — Hashed X card filenames and HTTPS share URLs
+
+- Home Open Graph image is now a content-hashed static JPEG (`/og/ds-home-<hash>.jpg`) with no query string. X often ignores `?v=` on image URLs and had already cached `/og/card.jpg`.
+- Floor cards are advertised at `/og/x/<floorId>-ds1.jpg` so the crawler sees a real `.jpg` path it has not cached. `/og/floor/:id` and `/api/share-card/:id` still work.
+- Added `og:image:secure_url`, `twitter:image:src`, and `link rel="image_src"`. Dynamic card routes answer HEAD. Cache-Control no longer uses `stale-while-revalidate`.
+- Share on X uses the canonical `https://` origin from `rel=canonical` (upgrading public `http://` hosts) instead of a bare hostname.
+- Cloudflare Bot Fight cannot be changed from this repo. Static hashed files under `/og/` are the app-level mitigation; `Twitterbot/1.0` succeeding via curl does not prove X's image downloader is unchallenged.
+- Verification: unit tests for hashed paths, slug parsing and HTTPS origin; TypeScript, formatting, production build and HTTP tests for hashed JPEG, HEAD, `image_src` / `secure_url`, and floor `.jpg` URLs.
+- Handoff: after deploy, share `https://draw.annieway.world` with no query. If the composer still shows a grey box, that is X's page-level cache of the bare domain — run Card Validator once on that exact URL. Do not ask users to append `/?v=2`.
+
 ## 2026-09-15 — Solved-floor history, activity sort, X card URLs
 
 - Solved (non-latest) floors now expose their own wrong-guess history, winning guess, accepted answers and public hint in the stack API and detail panel. The latest unsolved floor still hides answers until it is solved.

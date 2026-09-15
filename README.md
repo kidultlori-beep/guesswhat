@@ -33,7 +33,7 @@ Enter 1–10 distinct accepted answers, each up to 80 characters (809 total inpu
 
 Likes attach to the selected drawing's artist, not the stack founder. Comments unlock when that drawing is solved (and remain privately available to its artist beforehand). Rankings count floors, correct floor solves, and current drawing likes. Home, open stacks, activity cards and the notification bell poll for new activity while the page is visible. The home stack list is ordered by the stack's last activity (a new drawing, guess, like or comment), so recently updated stacks appear first.
 
-Each floor has a normal Share action plus **Share on X**. Shared pages advertise a spoiler-free 1200 × 630 editorial card containing the drawing, stack/floor number and artist—but never answers or guesses. The home page has a separate opaque RGB JPEG brand card, and SVG plus 32/96 px PNG favicons are supplied. Share images cache publicly for at least one day, Open Graph metadata declares their MIME type, and `/robots.txt` explicitly allows Twitterbot. X card crawlers need a publicly reachable HTTPS URL; `localhost` and private LAN addresses cannot produce public previews. The production deployment uses `DRAWSTACKS_PUBLIC_URL=https://draw.annieway.world` so canonical links and card URLs use the public origin. Home and floor Open Graph images are opaque JPEGs advertised with versioned image URLs (`/og/card.jpg`, `/og/floor/:id`) so X can fetch a card without adding `?v=` to the shared page.
+Each floor has a normal Share action plus **Share on X**. Shared pages advertise a spoiler-free 1200 × 630 editorial card containing the drawing, stack/floor number and artist—but never answers or guesses. The home page has a separate opaque RGB JPEG brand card, and SVG plus 32/96 px PNG favicons are supplied. Share images cache publicly for at least one day, Open Graph metadata declares their MIME type, and `/robots.txt` explicitly allows Twitterbot. X card crawlers need a publicly reachable HTTPS URL; `localhost` and private LAN addresses cannot produce public previews. The production deployment uses `DRAWSTACKS_PUBLIC_URL=https://draw.annieway.world` so canonical links and card URLs use the public origin. Home and floor Open Graph images are opaque JPEGs at **hashed or `.jpg` paths** (`/og/ds-home-<hash>.jpg`, `/og/x/<floorId>-ds1.jpg`) with no query string on the image URL. X's composer caches the bare domain separately from `/?v=2`; a new image filename is the app-level cache-bust. If the composer still shows a grey box for `https://draw.annieway.world` immediately after deploy, run X's Card Validator once on that exact URL (not `/?v=2`). Cloudflare Bot Fight / challenge pages can still block X's image fetcher even when `Twitterbot/1.0` curl succeeds; that is a dashboard setting this repo cannot change.
 
 ## Drawing tools
 
@@ -72,9 +72,9 @@ Unit tests use memory or a temporary isolated database. HTTP tests start a separ
 - `src/components/GameApp.tsx`: home, identity, stack/guess/social flows and rankings.
 - `src/components/DrawingEditor.tsx`: interactive Canvas editor and local draft lifecycle.
 - `src/lib/paint.ts`: connected raster fill algorithm.
-- `src/lib/share.ts`: selected-floor URLs, share copy, Open Graph image paths and platform intent builders.
-- `src/app/api/share-card/[floorId]/route.tsx`: spoiler-free social preview image renderer (also served from `/og/floor/:id`).
-- `scripts/generate-brand-assets.mjs`: repeatable favicon PNG and static home-card generator.
+- `src/lib/share.ts`: selected-floor URLs, HTTPS share origin, Open Graph image paths and platform intent builders.
+- `src/app/api/share-card/[floorId]/route.tsx`: spoiler-free social preview JPEG renderer (also served from `/og/floor/:id` and `/og/x/:id-ds1.jpg`).
+- `scripts/generate-brand-assets.mjs`: repeatable favicon PNG and content-hashed home-card generator.
 - `src/app/globals.css`: self-hosted Patrick Hand/Nunito typography, cream theme and responsive layouts.
 - [Architecture and handoff](docs/implementation-v1.md)
 

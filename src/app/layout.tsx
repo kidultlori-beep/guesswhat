@@ -4,26 +4,24 @@ import "@fontsource/nunito/400.css";
 import "@fontsource/nunito/600.css";
 import "@fontsource/nunito/700.css";
 import "./globals.css";
-import { homeOgImagePath } from "@/lib/share";
+import {
+  absoluteAssetUrl,
+  homeOgImagePath,
+  ogImageDescriptor,
+} from "@/lib/share";
 
 const title = "DrawStacks — Draw. Guess. Build together.";
 const description =
   "New answers and a new drawing on every floor. A collaborative drawing and guessing game.";
-const homeCard = homeOgImagePath();
-const homeImage = {
-  url: homeCard,
-  width: 1200,
-  height: 630,
-  type: "image/jpeg",
-  alt: title,
-};
+const metadataOrigin =
+  process.env.DRAWSTACKS_PUBLIC_URL || "http://localhost:3000";
+const homeCard = absoluteAssetUrl(homeOgImagePath(), metadataOrigin);
+const homeImage = ogImageDescriptor(homeCard, title);
 
 export const metadata: Metadata = {
   title,
   description,
-  metadataBase: new URL(
-    process.env.DRAWSTACKS_PUBLIC_URL || "http://localhost:3000",
-  ),
+  metadataBase: new URL(metadataOrigin),
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
@@ -38,6 +36,10 @@ export const metadata: Metadata = {
     title,
     description,
     images: [homeImage],
+  },
+  other: {
+    "og:image:secure_url": homeCard,
+    "twitter:image:src": homeCard,
   },
   icons: {
     icon: [

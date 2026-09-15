@@ -4,6 +4,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { resolve } from "node:path";
 import { PNG } from "pngjs";
 import sharp from "sharp";
+import { floorOgImagePath, homeOgImagePath } from "../src/lib/share";
 let server: ChildProcess;
 const root = "http://127.0.0.1:3101";
 let output = "";
@@ -69,14 +70,19 @@ async function player(nickname: string) {
 test("real HTTP publication, permissions, private guesses, social actions, relay and images", async () => {
   const homeHtml = await (await fetch(root)).text();
   assert.match(homeHtml, /summary_large_image/);
-  assert.match(homeHtml, /\/og\/card\.jpg/);
+  assert.match(homeHtml, /og:image:secure_url/);
+  assert.match(homeHtml, /rel="image_src"/);
+  assert.ok(homeHtml.includes(homeOgImagePath()));
+  assert.doesNotMatch(homeHtml, /og\/card\.jpg\?v=/);
   assert.match(homeHtml, /image\/jpeg/);
+  const hashedCard = homeOgImagePath();
   for (const asset of [
     ["/icon.svg", "image/svg+xml"],
     ["/icons/favicon-32.png", "image/png"],
     ["/icons/favicon-96.png", "image/png"],
     ["/og/home.jpg", "image/jpeg"],
     ["/og/card.jpg", "image/jpeg"],
+    [hashedCard, "image/jpeg"],
   ]) {
     const response = await fetch(`${root}${asset[0]}`);
     assert.equal(response.status, 200);
@@ -85,8 +91,12 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
       asset[1],
     );
   }
-  const homeCard = await fetch(`${root}/og/card.jpg`);
-  assert.match(homeCard.headers.get("cache-control") || "", /max-age=86400/);
+  const homeCard = await fetch(`${root}${hashedCard}`);
+  assert.match(homeCard.headers.get("cache-control") || "", /max-age=31536000/);
+  assert.ok(Number(homeCard.headers.get("content-length") || 0) > 1000);
+  const homeHead = await fetch(`${root}${hashedCard}`, { method: "HEAD" });
+  assert.equal(homeHead.status, 200);
+  assert.match(homeHead.headers.get("content-type") || "", /^image\/jpeg/);
   const homeCardMetadata = await sharp(
     Buffer.from(await homeCard.arrayBuffer()),
   ).metadata();
@@ -172,15 +182,23 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   assert.equal(card.width, 1200);
   assert.equal(card.height, 630);
   assert.equal(card.channels, 3);
-  const floorCard = await fetch(`${root}/og/floor/${s.floor}`);
+  const floorCard = await fetch(`${root}${floorOgImagePath(s.floor)}`);
   assert.equal(floorCard.status, 200);
   assert.match(floorCard.headers.get("content-type") || "", /^image\/jpeg/);
+  assert.ok(Number(floorCard.headers.get("content-length") || 0) > 1000);
+  const floorHead = await fetch(`${root}${floorOgImagePath(s.floor)}`, {
+    method: "HEAD",
+  });
+  assert.equal(floorHead.status, 200);
+  assert.match(floorHead.headers.get("content-type") || "", /^image\/jpeg/);
   const sharedPage = await fetch(
     `${root}/stacks/${s.id}?floor=${encodeURIComponent(s.floor)}`,
   );
   const sharedHtml = await sharedPage.text();
   assert.match(sharedHtml, /summary_large_image/);
-  assert.ok(sharedHtml.includes(`/og/floor/${s.floor}`));
+  assert.ok(sharedHtml.includes(floorOgImagePath(s.floor)));
+  assert.match(sharedHtml, /og:image:secure_url/);
+  assert.match(sharedHtml, /rel="image_src"/);
   assert.match(sharedHtml, /image\/jpeg/);
   assert.equal(
     (await call(`floors/${s.floor}/comments`, "GET", undefined, b.cookie))

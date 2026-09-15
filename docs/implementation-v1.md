@@ -35,7 +35,8 @@ Mutations need `X-DrawStacks: 1`; browser Origin must match Host. The session co
 | POST | `/api/stacks/:id/draw` | Winner publishes relay with `parent`, new `word` answers, public `hint`, `image`, `key` |
 | GET | `/api/floors/:id/image?preview=1` | Immutable PNG thumbnail; omit query for original |
 | GET | `/api/share-card/:floorId` | Public spoiler-free 1200 × 630 social preview JPEG |
-| GET | `/og/floor/:floorId` | Same JPEG as `/api/share-card/:floorId`, advertised in Open Graph / X tags |
+| GET | `/og/floor/:floorId` | Alias of `/api/share-card/:floorId` |
+| GET | `/og/x/:floorId-ds1.jpg` | Advertised floor Open Graph JPEG (`.jpg` extension for image crawlers) |
 | PUT | `/api/floors/:id/like` | Set explicit boolean `liked`, safe to retry |
 | GET / POST | `/api/floors/:id/comments` | Read/post authorized plain-text comments |
 | DELETE | `/api/comments/:id` | Owner-only deletion |
@@ -57,7 +58,9 @@ Drafts retain the compatible `word` field and add `answerInput` plus `hint` for 
 
 ### Social sharing
 
-Selected-floor pages emit Open Graph and X `summary_large_image` metadata. The dynamic editorial card is an opaque sRGB JPEG containing only public floor art, stack/floor numbers, artist nickname and neutral invitation copy; its renderer must never query guesses or answers. The home page uses a separate opaque RGB JPEG 1200 × 630 brand card at `/og/card.jpg`. Metadata declares each card's MIME type, uses absolute HTTPS image URLs with a version query on the image path (not the page URL), and includes `Content-Length`. Card responses cache publicly for at least 24 hours, and the generated `/robots.txt` explicitly allows Twitterbot. Floor cards are advertised at `/og/floor/:id` (the `/api/share-card/:id` alias remains). SVG and 32/96 px PNG favicon assets are linked from the root metadata. `src/lib/share.ts` owns canonical floor paths, card image paths and platform intent encoding. The X action opens `https://x.com/intent/tweet` in a new browsing context, so the player reviews and submits the post on X; no X token is collected.
+Selected-floor pages emit Open Graph and X `summary_large_image` metadata. The dynamic editorial card is an opaque sRGB JPEG containing only public floor art, stack/floor numbers, artist nickname and neutral invitation copy; its renderer must never query guesses or answers. The home page uses a content-hashed static JPEG at `/og/ds-home-<hash>.jpg` (legacy `/og/home.jpg` and `/og/card.jpg` remain as copies). Floor cards are advertised at `/og/x/:floorId-ds1.jpg` so the URL has a `.jpg` extension; `/og/floor/:id` and `/api/share-card/:id` remain aliases. Metadata includes absolute HTTPS `og:image` / `twitter:image`, `og:image:secure_url`, `twitter:image:src`, and `link rel="image_src"`. Image URLs are not query-versioned. Card responses send `Content-Type: image/jpeg`, `Content-Length`, CORS, `nosniff`, and `Content-Disposition: inline`. Hashed home files cache as immutable; floor JPEGs cache for a day. HEAD is supported on dynamic cards. `src/lib/share.ts` owns canonical HTTPS floor URLs, card paths, and X intent encoding. In-app Share on X uses the canonical origin from the page's `rel=canonical` link (production: `https://draw.annieway.world`), not a bare host.
+
+X caches cards per shared page URL. Changing the **image** filename does not by itself recrawl `https://draw.annieway.world`; after the first deploy of a new hash, one Card Validator refresh of the bare domain may still be needed if the composer shows a grey placeholder. Cloudflare Super Bot Fight Mode can challenge X's image downloader (a different client than `Twitterbot/1.0`); that cannot be changed from this repository.
 
 Use `DRAWSTACKS_PUBLIC_URL` in hosted/proxied environments. Without it, metadata derives the request origin. Social crawlers cannot reach localhost or private LAN origins. Future platform buttons should be adapters around the same canonical URL and metadata, with the native Web Share API remaining the device-level fallback. OAuth posting APIs are a separate, explicit-consent feature and must not reuse the anonymous game cookie as social authorization.
 

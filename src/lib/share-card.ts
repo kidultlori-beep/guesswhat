@@ -83,7 +83,8 @@ export async function shareCardResponse(floorId: string) {
     headers: {
       "Content-Type": "image/jpeg",
       "Content-Length": String(body.byteLength),
-      "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+      "Cache-Control": "public, max-age=86400",
+      "Content-Disposition": 'inline; filename="drawstacks.jpg"',
       "X-Content-Type-Options": "nosniff",
       "Access-Control-Allow-Origin": "*",
     },

@@ -4,7 +4,10 @@ import { Game, GameError } from "../src/lib/game";
 import { PNG } from "pngjs";
 import { parseAnswers, matchesAnswer } from "../src/lib/answers";
 import {
+  canonicalShareOrigin,
+  floorIdFromOgSlug,
   floorOgImagePath,
+  floorShareAbsoluteUrl,
   floorSharePath,
   floorShareText,
   homeOgImagePath,
@@ -109,10 +112,22 @@ test("share links preserve the selected floor and build an encoded X intent", ()
   assert.equal(intent.pathname, "/intent/tweet");
   assert.equal(intent.searchParams.get("text"), text);
   assert.equal(intent.searchParams.get("url"), `https://draw.example${path}`);
-  assert.equal(homeOgImagePath(), "/og/card.jpg?v=20260915");
+  assert.match(homeOgImagePath(), /^\/og\/ds-home-[0-9a-f]{12}\.jpg$/);
+  assert.equal(homeOgImagePath().includes("?"), false);
+  assert.equal(floorOgImagePath("floor ? 2"), "/og/x/floor%20%3F%202-ds1.jpg");
+  assert.equal(floorIdFromOgSlug("abc-ds1.jpg"), "abc");
+  assert.equal(floorIdFromOgSlug("abc.jpg"), null);
   assert.equal(
-    floorOgImagePath("floor ? 2"),
-    "/og/floor/floor%20%3F%202?v=20260915",
+    canonicalShareOrigin("http://draw.annieway.world"),
+    "https://draw.annieway.world",
+  );
+  assert.equal(
+    canonicalShareOrigin("http://localhost:3000"),
+    "http://localhost:3000",
+  );
+  assert.equal(
+    floorShareAbsoluteUrl("http://draw.annieway.world/", "s", "f"),
+    "https://draw.annieway.world/stacks/s?floor=f",
   );
 });
 test("share cards render as opaque JPEG without answers", async () => {
