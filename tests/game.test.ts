@@ -10,7 +10,9 @@ import {
   floorShareAbsoluteUrl,
   floorSharePath,
   floorShareText,
+  HOME_SHARE_PATH,
   homeOgImagePath,
+  homeShareAbsoluteUrl,
   xShareUrl,
 } from "../src/lib/share";
 import { floodFill } from "../src/lib/paint";
@@ -128,6 +130,18 @@ test("share links preserve the selected floor and build an encoded X intent", ()
   assert.equal(
     floorShareAbsoluteUrl("http://draw.annieway.world/", "s", "f"),
     "https://draw.annieway.world/stacks/s?floor=f",
+  );
+  assert.equal(HOME_SHARE_PATH, "/play");
+  assert.equal(
+    homeShareAbsoluteUrl("http://draw.annieway.world"),
+    "https://draw.annieway.world/play",
+  );
+  const homeIntent = new URL(
+    xShareUrl(homeShareAbsoluteUrl("https://draw.annieway.world"), "Play"),
+  );
+  assert.equal(
+    homeIntent.searchParams.get("url"),
+    "https://draw.annieway.world/play",
   );
 });
 test("share cards render as opaque JPEG without answers", async () => {

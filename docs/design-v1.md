@@ -47,7 +47,7 @@ Proposed first-version defaults, chosen to resolve conflicting older documents:
 
 - Shared header: original `DRAWSTACKS` wordmark, `Stacks`, `Leaderboards`, and nickname control.
 - Title: `Every drawing builds a story.` Supporting sentence: `Pick a stack, guess the word, and draw the next floor.`
-- Primary action: `+ Start a stack`.
+- Primary action: `+ Start a stack`. Home also has **Share on X**, which shares the `/play` URL (not the bare domain).
 - Three-column desktop grid, two columns on tablet, one on phones. A stack is represented by slightly offset drawing sheets, with its latest drawing prominent.
 - Show public stack number, published floor count, founding author, and total likes across its floors. Default ordering is most recently updated activity first (new drawing, guess, like or comment); use `Load more` after the initial batch.
 - Default titles are `Stack #024`, not the secret word. A free-text title field is omitted from v1 to avoid obvious answer leaks.
@@ -105,7 +105,7 @@ Social actions appear below published art. In a brand-new draft they are disable
 - Comments attach to a floor; plain text, 1–300 characters, chronological order, nickname and relative time. Before a solve, only its artist can access them. After the first correct solve they are public, alongside a server-generated solve card containing the picture, exact winning guess and full answer list.
 - The solved floor's artist receives a bell notification with an unread count. Opening the menu marks the current notification list read. Stack state, activity and notifications poll while visible for near-real-time updates.
 - A user can delete their own comment after confirmation. Raw HTML is never rendered. Requests require the server session; a nickname is not proof of ownership.
-- `Share` opens the browser's native share sheet when supported, otherwise copies a link to the selected floor. `Share on X` opens X's editable Web Intent composer. Success text for copying remains `Link copied!`. Never automatically post to a social network.
+- `Share` opens the browser's native share sheet when supported, otherwise copies a link to the selected floor. `Share on X` opens X's editable Web Intent composer with that floor URL. The home **Share on X** action shares `/play`. Success text for copying remains `Link copied!`. Never automatically post to a social network.
 - Shared pages use a 1200 × 630 card: warm cream background, layered white/yellow drawing sheets on the left, real selected-floor art, DrawStacks wordmark and blue prompt badge on the right, plus `Can you guess this drawing?`. Include stack/floor identity and artist nickname; never include accepted answers, guess history or viewer state.
 - Shared title/preview never contains the secret word, the sender's answer state or private guesses. The receiver is evaluated using their own session.
 - Localhost links work only on the host computer. LAN play needs the server's reachable LAN address; public links require a separately hosted release.

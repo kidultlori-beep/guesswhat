@@ -4,6 +4,10 @@ import { HOME_OG_FILE } from "./og-home-file";
 // fetch a filename they have never cached. Do not version with a query
 // string: X's image fetcher often ignores `?v=` on image URLs.
 export const FLOOR_OG_TAG = "ds1";
+export const HOME_SHARE_PATH = "/play";
+export const HOME_SHARE_TITLE = "DrawStacks — Draw. Guess. Build together.";
+export const HOME_SHARE_DESCRIPTION =
+  "New answers and a new drawing on every floor. A collaborative drawing and guessing game.";
 
 export function homeOgImagePath() {
   return `/og/${HOME_OG_FILE}`;
@@ -49,6 +53,14 @@ export function floorShareAbsoluteUrl(
   floorId: string,
 ) {
   return `${canonicalShareOrigin(origin)}${floorSharePath(stackId, floorId)}`;
+}
+
+export function homeShareAbsoluteUrl(origin: string) {
+  return `${canonicalShareOrigin(origin)}${HOME_SHARE_PATH}`;
+}
+
+export function homeShareText() {
+  return "Draw. Guess. Build together. Pick a stack and draw the next floor on DrawStacks!";
 }
 
 export function browserShareOrigin() {
