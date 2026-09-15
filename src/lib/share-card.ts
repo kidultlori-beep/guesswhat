@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { getGame } from "./server";
 
 function escapeXml(value: string) {
   return value.replace(/[<>&"']/g, (character) => {
@@ -52,5 +53,39 @@ export async function renderShareCard(input: {
       <line x1="54" y1="581" x2="1146" y2="581" stroke="#A7372F" stroke-width="3"/>
     </svg>`;
 
-  return sharp(Buffer.from(svg)).png().toBuffer();
+  return sharp(Buffer.from(svg))
+    .flatten({ background: "#F8F0E3" })
+    .toColourspace("srgb")
+    .jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
+    .toBuffer();
+}
+
+export async function shareCardResponse(floorId: string) {
+  const game = getGame();
+  const floor = game.db
+    .prepare(
+      `SELECT f.image,f.floor_index floor,s.number,u.nickname author
+       FROM floors f JOIN stacks s ON s.id=f.stack_id JOIN users u ON u.id=f.author_id
+       WHERE f.id=?`,
+    )
+    .get(floorId) as
+    | { image: Buffer; floor: number; number: number; author: string }
+    | undefined;
+  if (!floor) return new Response("Drawing not found.", { status: 404 });
+
+  const body = await renderShareCard({
+    image: floor.image,
+    stackNumber: floor.number,
+    floorIndex: floor.floor,
+    author: floor.author,
+  });
+  return new Response(new Uint8Array(body), {
+    headers: {
+      "Content-Type": "image/jpeg",
+      "Content-Length": String(body.byteLength),
+      "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+      "X-Content-Type-Options": "nosniff",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }

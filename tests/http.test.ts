@@ -69,13 +69,14 @@ async function player(nickname: string) {
 test("real HTTP publication, permissions, private guesses, social actions, relay and images", async () => {
   const homeHtml = await (await fetch(root)).text();
   assert.match(homeHtml, /summary_large_image/);
-  assert.match(homeHtml, /\/og\/home\.jpg/);
+  assert.match(homeHtml, /\/og\/card\.jpg/);
   assert.match(homeHtml, /image\/jpeg/);
   for (const asset of [
     ["/icon.svg", "image/svg+xml"],
     ["/icons/favicon-32.png", "image/png"],
     ["/icons/favicon-96.png", "image/png"],
     ["/og/home.jpg", "image/jpeg"],
+    ["/og/card.jpg", "image/jpeg"],
   ]) {
     const response = await fetch(`${root}${asset[0]}`);
     assert.equal(response.status, 200);
@@ -84,7 +85,7 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
       asset[1],
     );
   }
-  const homeCard = await fetch(`${root}/og/home.jpg`);
+  const homeCard = await fetch(`${root}/og/card.jpg`);
   assert.match(homeCard.headers.get("cache-control") || "", /max-age=86400/);
   const homeCardMetadata = await sharp(
     Buffer.from(await homeCard.arrayBuffer()),
@@ -161,18 +162,26 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
     throw new Error(
       `Share card returned ${shareCard.status}: ${await shareCard.text()}\nServer output:\n${output}`,
     );
-  assert.match(shareCard.headers.get("content-type") || "", /^image\/png/);
+  assert.match(shareCard.headers.get("content-type") || "", /^image\/jpeg/);
   assert.match(shareCard.headers.get("cache-control") || "", /max-age=86400/);
-  const card = PNG.sync.read(Buffer.from(await shareCard.arrayBuffer()));
+  assert.ok(Number(shareCard.headers.get("content-length") || 0) > 1000);
+  const card = await sharp(
+    Buffer.from(await shareCard.arrayBuffer()),
+  ).metadata();
+  assert.equal(card.format, "jpeg");
   assert.equal(card.width, 1200);
   assert.equal(card.height, 630);
+  assert.equal(card.channels, 3);
+  const floorCard = await fetch(`${root}/og/floor/${s.floor}`);
+  assert.equal(floorCard.status, 200);
+  assert.match(floorCard.headers.get("content-type") || "", /^image\/jpeg/);
   const sharedPage = await fetch(
     `${root}/stacks/${s.id}?floor=${encodeURIComponent(s.floor)}`,
   );
   const sharedHtml = await sharedPage.text();
   assert.match(sharedHtml, /summary_large_image/);
-  assert.ok(sharedHtml.includes(`/api/share-card/${s.floor}`));
-  assert.match(sharedHtml, /image\/png/);
+  assert.ok(sharedHtml.includes(`/og/floor/${s.floor}`));
+  assert.match(sharedHtml, /image\/jpeg/);
   assert.equal(
     (await call(`floors/${s.floor}/comments`, "GET", undefined, b.cookie))
       .status,
@@ -279,7 +288,38 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
     b.cookie,
   );
   assert.equal(relay.status, 201);
-  assert.equal((await (await call(`stacks/${s.id}`)).json()).floors.length, 2);
+  const afterRelay = await (await call(`stacks/${s.id}`)).json();
+  assert.equal(afterRelay.floors.length, 2);
+  assert.equal(afterRelay.floors[0].answers, "ELON MUSK,马斯克");
+  assert.equal(afterRelay.floors[0].hint, "A technology founder.");
+  assert.equal(afterRelay.floors[0].winningGuess, "马斯克");
+  assert.equal(afterRelay.floors[0].winner, "HTTP Bob");
+  assert.equal(afterRelay.floors[0].guesses[0].text, "car");
+  assert.equal(afterRelay.floors[1].answers, null);
+  assert.equal(afterRelay.word, null);
+  const second = await call(
+    "stacks",
+    "POST",
+    {
+      word: "moon",
+      hint: "It shines at night.",
+      key: "http-second-stack",
+      image,
+    },
+    a.cookie,
+  );
+  assert.equal(second.status, 201);
+  const secondStack = await second.json();
+  assert.equal(
+    (await (await call("stacks")).json()).stacks[0].id,
+    secondStack.id,
+  );
+  assert.equal(
+    (await call(`floors/${s.floor}/like`, "PUT", { liked: true }, c.cookie))
+      .status,
+    200,
+  );
+  assert.equal((await (await call("stacks")).json()).stacks[0].id, s.id);
   const alerts = await (
     await call("notifications", "GET", undefined, a.cookie)
   ).json();
@@ -289,7 +329,7 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   assert.equal((await call("notifications", "PUT", {}, a.cookie)).status, 200);
   const rank = await (await call("leaderboards?tab=artists")).json();
   assert.equal(rank.rows[0].id, a.user.id);
-  assert.equal(rank.rows[0].score, 1);
+  assert.equal(rank.rows[0].score, 2);
   assert.equal(
     (
       await (

@@ -30,8 +30,12 @@ const home = `
   <line x1="62" y1="572" x2="1138" y2="572" stroke="#A7372F" stroke-width="3"/>
 </svg>`;
 
-await sharp(Buffer.from(home))
+const homeCard = await sharp(Buffer.from(home))
   .flatten({ background: "#F8F0E3" })
   .toColourspace("srgb")
   .jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
-  .toFile("public/og/home.jpg");
+  .toBuffer();
+await Promise.all([
+  sharp(homeCard).toFile("public/og/home.jpg"),
+  sharp(homeCard).toFile("public/og/card.jpg"),
+]);

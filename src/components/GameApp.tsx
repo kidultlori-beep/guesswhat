@@ -665,6 +665,8 @@ function StackPage({
         </section>
         <GuessPanel
           data={data}
+          floor={floor}
+          onShowLatest={() => selectFloor(data.targetFloorId)}
           onChange={(d) => {
             revision.current++;
             setData(d);
@@ -676,13 +678,48 @@ function StackPage({
     </>
   );
 }
+function FloorHint({ hint }: { hint: string }) {
+  if (!hint) return null;
+  return <p className="hint">Hint: “{hint}”</p>;
+}
+function WrongGuessList({ guesses }: { guesses: StackDetail["guesses"] }) {
+  if (!guesses.length) return null;
+  return (
+    <div className="guess-history">
+      <h3>Wrong guesses</h3>
+      {guesses.slice(0, 12).map((g, index) => (
+        <p key={`${g.author}-${g.text}-${index}`}>
+          <XCircle size={19} />
+          <span>
+            <strong>{g.author}</strong> guessed “{g.text}”
+          </span>
+          <small>Not quite</small>
+        </p>
+      ))}
+    </div>
+  );
+}
+function HowItWorks() {
+  return (
+    <div className="how-it-works">
+      <h3>A little team effort</h3>
+      <p>1. Guess an accepted answer.</p>
+      <p>2. Set new answers and draw the next floor.</p>
+      <p>3. The next player continues the chain.</p>
+    </div>
+  );
+}
 function GuessPanel({
   data,
+  floor,
+  onShowLatest,
   onChange,
   user,
   requireUser,
 }: {
   data: StackDetail;
+  floor: StackDetail["floors"][number];
+  onShowLatest: () => void;
   onChange: (d: StackDetail) => void;
   user: User | null;
   requireUser: RequireUser;
@@ -731,15 +768,37 @@ function GuessPanel({
       setBusy(false);
     }
   }
-  const latest = data.floors.at(-1)!,
-    own = user?.id === latest.authorId,
-    unlocked = !!data.word,
-    wrong = data.guesses;
+  const latest = floor.id === data.targetFloorId,
+    own = user?.id === floor.authorId,
+    unlocked = !!floor.answers;
+  if (!latest) {
+    return (
+      <aside className="guess-panel panel">
+        <CheckCircle className="green" size={44} weight="duotone" />
+        <h2>Floor {floor.index} was solved.</h2>
+        <FloorHint hint={floor.hint} />
+        {floor.winningGuess && (
+          <p className="solved-floor-meta">
+            <strong>{floor.winner}</strong> guessed “{floor.winningGuess}”
+          </p>
+        )}
+        <p>The artist accepted</p>
+        <div className="revealed-word">
+          {floor.answers?.split(",").join(" / ")}
+        </div>
+        <button className="text-button" onClick={onShowLatest}>
+          View the latest floor
+        </button>
+        <WrongGuessList guesses={floor.guesses} />
+        <HowItWorks />
+      </aside>
+    );
+  }
   return (
     <aside className="guess-panel panel">
       {unlocked ? (
         <>
-          {latest.revealed ? (
+          {floor.revealed ? (
             <CheckCircle className="green" size={44} weight="duotone" />
           ) : (
             <Lightbulb className="blue" size={44} weight="duotone" />
@@ -747,17 +806,23 @@ function GuessPanel({
           <h2>
             {data.solved
               ? "You got it!"
-              : own && !latest.revealed
+              : own && !floor.revealed
                 ? "Waiting for a guess."
                 : "This floor was solved."}
           </h2>
+          <FloorHint hint={floor.hint} />
+          {floor.winningGuess && (
+            <p className="solved-floor-meta">
+              <strong>{floor.winner}</strong> guessed “{floor.winningGuess}”
+            </p>
+          )}
           <p>
-            {latest.revealed
+            {floor.revealed
               ? "The artist accepted"
               : "Your private accepted answers"}
           </p>
           <div className="revealed-word">
-            {data.word?.split(",").join(" / ")}
+            {floor.answers?.split(",").join(" / ")}
           </div>
           {data.canDraw ? (
             <>
@@ -776,10 +841,10 @@ function GuessPanel({
               {data.floors.length >= 50
                 ? "50 floors! This stack is complete."
                 : own
-                  ? latest.revealed
+                  ? floor.revealed
                     ? "Your drawing was solved — check your notification above."
                     : "Share it and let your friends guess."
-                  : latest.revealed
+                  : floor.revealed
                     ? "The winner is drawing the next floor."
                     : "See what others draw next!"}
             </p>
@@ -793,7 +858,7 @@ function GuessPanel({
             Guess the latest drawing. Match any answer its artist set to win the
             next drawing turn.
           </p>
-          {latest.hint && <p className="hint">Hint: “{latest.hint}”</p>}
+          <FloorHint hint={floor.hint} />
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -842,26 +907,8 @@ function GuessPanel({
           {feedback}
         </p>
       )}
-      {wrong.length > 0 && (
-        <div className="guess-history">
-          <h3>Wrong guesses</h3>
-          {wrong.slice(0, 12).map((g, index) => (
-            <p key={`${g.author}-${g.text}-${index}`}>
-              <XCircle size={19} />
-              <span>
-                <strong>{g.author}</strong> guessed “{g.text}”
-              </span>
-              <small>Not quite</small>
-            </p>
-          ))}
-        </div>
-      )}
-      <div className="how-it-works">
-        <h3>A little team effort</h3>
-        <p>1. Guess an accepted answer.</p>
-        <p>2. Set new answers and draw the next floor.</p>
-        <p>3. The next player continues the chain.</p>
-      </div>
+      <WrongGuessList guesses={floor.guesses} />
+      <HowItWorks />
     </aside>
   );
 }

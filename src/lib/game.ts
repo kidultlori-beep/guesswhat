@@ -16,6 +16,7 @@ import type {
   StackDetail,
   StackSummary,
   Floor,
+  FloorGuess,
   RankRow,
   Notification,
 } from "./types";
@@ -185,6 +186,40 @@ export class Game {
         .get(uid, id)
     );
   }
+  touch(stackId: string) {
+    this.db
+      .prepare("UPDATE stacks SET updated=? WHERE id=?")
+      .run(this.now(), stackId);
+  }
+  floorHistory(floorIds: string[]) {
+    const guesses = new Map<string, FloorGuess[]>();
+    const winners = new Map<string, { text: string; author: string }>();
+    if (!floorIds.length) return { guesses, winners };
+    const placeholders = floorIds.map(() => "?").join(",");
+    const wrong = this.db
+      .prepare(
+        `SELECT g.floor_id floorId,g.text,u.nickname author
+         FROM floor_guesses g JOIN users u ON u.id=g.user_id
+         WHERE g.correct=0 AND g.floor_id IN (${placeholders})
+         ORDER BY g.id DESC`,
+      )
+      .all(...floorIds) as { floorId: string; text: string; author: string }[];
+    for (const row of wrong) {
+      const list = guesses.get(row.floorId) ?? [];
+      if (list.length < 50)
+        list.push({ text: row.text, correct: false, author: row.author });
+      guesses.set(row.floorId, list);
+    }
+    const solved = this.db
+      .prepare(
+        `SELECT g.floor_id floorId,g.text,u.nickname author
+         FROM floor_guesses g JOIN users u ON u.id=g.user_id
+         WHERE g.correct=1 AND g.floor_id IN (${placeholders})`,
+      )
+      .all(...floorIds) as { floorId: string; text: string; author: string }[];
+    for (const row of solved) winners.set(row.floorId, row);
+    return { guesses, winners };
+  }
   meter(uid: string | undefined, floorId: string) {
     const now = this.now();
     const row = uid
@@ -250,17 +285,7 @@ export class Game {
         .prepare("SELECT nickname FROM users WHERE id=?")
         .get(s.creator_id) as { nickname: string }
     ).nickname;
-    const guesses = this.db
-      .prepare(
-        `SELECT g.text,0 correct,u.nickname author
-         FROM floor_guesses g JOIN users u ON u.id=g.user_id
-         WHERE g.floor_id=? AND g.correct=0 ORDER BY g.id DESC LIMIT 50`,
-      )
-      .all(target.id) as unknown as {
-      text: string;
-      correct: number;
-      author: string;
-    }[];
+    const history = this.floorHistory(floors.map((floor) => floor.id));
     const meter = this.meter(uid, target.id);
     const revealed = !!this.db
       .prepare("SELECT 1 FROM floor_guesses WHERE floor_id=? AND correct=1")
@@ -270,11 +295,18 @@ export class Game {
       number: s.number,
       creator,
       creatorId: s.creator_id,
-      floors: floors.map((f) => ({
-        ...f,
-        liked: !!f.liked,
-        revealed: !!f.revealed,
-      })),
+      floors: floors.map((f) => {
+        const open = !!f.revealed;
+        const winner = open ? (history.winners.get(f.id) ?? null) : null;
+        return {
+          ...f,
+          liked: !!f.liked,
+          revealed: open,
+          guesses: history.guesses.get(f.id) ?? [],
+          winningGuess: winner?.text ?? null,
+          winner: winner?.author ?? null,
+        };
+      }),
       word:
         solved || uid === target.author_id || revealed ? target.answers : null,
       solved,
@@ -283,10 +315,7 @@ export class Game {
       remaining: meter.remaining,
       resetAt: meter.resetAt,
       now: this.now(),
-      guesses: guesses.map((guess) => ({
-        ...guess,
-        correct: false as const,
-      })),
+      guesses: history.guesses.get(target.id) ?? [],
       targetFloorId: target.id,
     };
   }
@@ -408,9 +437,7 @@ export class Game {
           answers,
           hint,
         );
-      this.db
-        .prepare("UPDATE stacks SET updated=? WHERE id=?")
-        .run(this.now(), id);
+      this.touch(id);
       this.db
         .prepare("INSERT INTO publications VALUES(?,?,?,?)")
         .run(uid, key, id, floor);
@@ -456,6 +483,7 @@ export class Game {
           "INSERT INTO floor_guesses(user_id,floor_id,text,correct,created) VALUES(?,?,?,?,?)",
         )
         .run(uid, target.id, guess, Number(correct), this.now());
+      this.touch(id);
       if (!correct)
         this.db
           .prepare(
@@ -487,11 +515,12 @@ export class Game {
   like(uid: string, id: string, liked: boolean) {
     const f = this.floor(id);
     if (f.author_id === uid) fail(403, "You cannot like your own drawing.");
-    if (liked)
-      this.db
+    if (liked) {
+      const result = this.db
         .prepare("INSERT OR IGNORE INTO likes VALUES(?,?,?)")
         .run(uid, id, this.now());
-    else
+      if (result.changes) this.touch(f.stack_id);
+    } else
       this.db
         .prepare("DELETE FROM likes WHERE user_id=? AND floor_id=?")
         .run(uid, id);
@@ -534,6 +563,7 @@ export class Game {
     this.db
       .prepare("INSERT INTO comments VALUES(?,?,?,?,?)")
       .run(id, uid, floor, content, this.now());
+    this.touch(this.floor(floor).stack_id);
     return { id };
   }
   removeComment(uid: string, id: string) {

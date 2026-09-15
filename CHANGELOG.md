@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-15 — Solved-floor history, activity sort, X card URLs
+
+- Solved (non-latest) floors now expose their own wrong-guess history, winning guess, accepted answers and public hint in the stack API and detail panel. The latest unsolved floor still hides answers until it is solved.
+- Home / open-stacks ordering uses `stacks.updated`. That timestamp now advances on a new drawing, guess, like or comment, so recently active stacks move to the front of the list.
+- X/Open Graph cards use opaque sRGB JPEGs with `Content-Length`, CORS and `image/jpeg` metadata. Home advertising moved to a new `/og/card.jpg` path; floor cards are advertised at `/og/floor/:id` with a version query on the **image** URL so crawlers do not need `?v=` on the public page. Share images remain spoiler-free.
+- Verification: unit tests for per-floor history, activity sorting and JPEG card rendering; TypeScript, formatting, production build and the HTTP integration test (stack history after relay, list order after a like, JPEG/OG URL checks). Browser interaction of the solved-floor panel remains to be playtested.
+- Handoff: after deploy, share a normal `https://draw.annieway.world` or floor URL (no `?v=`). If X still shows a stale cached card for `/` only, use X's Card Validator once on the bare domain; users should not need a query string on share links.
+
 ## 2026-09-14 — X crawler compatibility hardening
 
 - Replaced the home Open Graph PNG with an opaque three-channel sRGB JPEG and declared `og:image:type` for both the home JPEG and dynamic floor PNG cards.

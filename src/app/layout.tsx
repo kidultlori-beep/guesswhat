@@ -4,36 +4,40 @@ import "@fontsource/nunito/400.css";
 import "@fontsource/nunito/600.css";
 import "@fontsource/nunito/700.css";
 import "./globals.css";
+import { homeOgImagePath } from "@/lib/share";
+
+const title = "DrawStacks — Draw. Guess. Build together.";
+const description =
+  "New answers and a new drawing on every floor. A collaborative drawing and guessing game.";
+const homeCard = homeOgImagePath();
+const homeImage = {
+  url: homeCard,
+  width: 1200,
+  height: 630,
+  type: "image/jpeg",
+  alt: title,
+};
+
 export const metadata: Metadata = {
-  title: "DrawStacks — Draw. Guess. Build together.",
-  description:
-    "New answers and a new drawing on every floor. A collaborative drawing and guessing game.",
+  title,
+  description,
   metadataBase: new URL(
     process.env.DRAWSTACKS_PUBLIC_URL || "http://localhost:3000",
   ),
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
-    title: "DrawStacks — Draw. Guess. Build together.",
-    description:
-      "New answers and a new drawing on every floor. A collaborative drawing and guessing game.",
+    title,
+    description,
     url: "/",
     siteName: "DrawStacks",
-    images: [
-      {
-        url: "/og/home.jpg",
-        width: 1200,
-        height: 630,
-        type: "image/jpeg",
-      },
-    ],
+    images: [homeImage],
   },
   twitter: {
     card: "summary_large_image",
-    title: "DrawStacks — Draw. Guess. Build together.",
-    description:
-      "New answers and a new drawing on every floor. A collaborative drawing and guessing game.",
-    images: ["/og/home.jpg"],
+    title,
+    description,
+    images: [homeImage],
   },
   icons: {
     icon: [

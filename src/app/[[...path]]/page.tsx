@@ -2,7 +2,7 @@ import GameApp from "@/components/GameApp";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { getGame } from "@/lib/server";
-import { floorSharePath } from "@/lib/share";
+import { floorOgImagePath, floorSharePath } from "@/lib/share";
 
 type PageProps = {
   params: Promise<{ path?: string[] }>;
@@ -48,7 +48,15 @@ export async function generateMetadata({
   const title = `Can you guess Floor ${floor.floor}? — DrawStacks`;
   const description = `A drawing by ${floor.author} in Stack #${String(floor.number).padStart(3, "0")}. Solve it to draw the next floor.`;
   const pageUrl = `${origin}${floorSharePath(path[1], floor.id)}`;
-  const cardUrl = `${origin}/api/share-card/${encodeURIComponent(floor.id)}`;
+  const cardUrl = `${origin}${floorOgImagePath(floor.id)}`;
+  const cardImage = {
+    url: cardUrl,
+    secureUrl: cardUrl,
+    width: 1200,
+    height: 630,
+    alt: title,
+    type: "image/jpeg",
+  };
   return {
     title,
     description,
@@ -59,21 +67,13 @@ export async function generateMetadata({
       description,
       url: pageUrl,
       siteName: "DrawStacks",
-      images: [
-        {
-          url: cardUrl,
-          width: 1200,
-          height: 630,
-          alt: title,
-          type: "image/png",
-        },
-      ],
+      images: [cardImage],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [cardUrl],
+      images: [cardImage],
     },
   };
 }

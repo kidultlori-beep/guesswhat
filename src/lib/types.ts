@@ -14,6 +14,11 @@ export interface StackSummary {
   solved: boolean;
   contributed: boolean;
 }
+export interface FloorGuess {
+  text: string;
+  correct: false;
+  author: string;
+}
 export interface Floor {
   id: string;
   index: number;
@@ -27,6 +32,9 @@ export interface Floor {
   answers: string | null;
   revealed: boolean;
   solves: number;
+  guesses: FloorGuess[];
+  winningGuess: string | null;
+  winner: string | null;
 }
 export interface StackDetail {
   id: string;
@@ -43,7 +51,7 @@ export interface StackDetail {
   remaining: number;
   resetAt: number | null;
   now: number;
-  guesses: { text: string; correct: false; author: string }[];
+  guesses: FloorGuess[];
   targetFloorId: string;
 }
 export const MAX_HINT_LENGTH = 160;
