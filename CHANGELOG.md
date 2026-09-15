@@ -5,7 +5,7 @@
 - Added `/play` as the first-class home share path. It renders the same playable home screen, and the initial HTML includes full Open Graph / X tags with `canonical` and `og:url` set to `https://draw.annieway.world/play` and the hashed home JPEG. X has never cached that page URL, unlike the bare domain.
 - Home **Share on X** now shares `/play`, not the origin. Floor **Share on X** is unchanged (`/stacks/...?floor=...`).
 - Do not append `/?v=2` to share links. If someone pastes the bare domain into X, that page cache can stay grey until a one-time Card Validator refresh; product buttons use `/play`.
-- Verification: unit tests for `/play` absolute URLs and X intent; HTTP test asserts `/play` HTML has every `canonical`/`og:url` ending in `/play` (layout no longer emits a competing `/` canonical), the hashed JPEG, `image_src`, and `image/jpeg`. Floor share meta still uses `/stacks/...?floor=...` and `/og/x/…-ds1.jpg`.
+- Verification: Prettier and TypeScript passed. 22 unit tests passed, including `/play` absolute URLs and X intent. Production build lists `/play` as its own route. HTTP integration test passed: `/play` HTML has every `canonical`/`og:url` ending in `/play`, the hashed JPEG, `image_src`, and `image/jpeg`; floor share meta still uses `/stacks/...?floor=...` and `/og/x/…-ds1.jpg`. Inspected production HTML for `/` vs `/play`. Clicked home **Share on X** on both `/` and `/play`; the intent URL included `/play`, not the bare origin. No live X Card Validator or multiplayer playtest.
 
 ## 2026-09-15 — Hashed X card filenames and HTTPS share URLs
 
