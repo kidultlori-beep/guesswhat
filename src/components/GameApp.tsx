@@ -34,7 +34,12 @@ import type {
 } from "@/lib/types";
 import { api, imageUrl, stackName, errorMessage } from "@/lib/client";
 import { MAX_ANSWER_LENGTH } from "@/lib/answers";
-import { floorSharePath, floorShareText, xShareUrl } from "@/lib/share";
+import {
+  browserShareOrigin,
+  floorShareAbsoluteUrl,
+  floorShareText,
+  xShareUrl,
+} from "@/lib/share";
 import DrawingEditor from "./DrawingEditor";
 
 type RequireUser = (action: () => void) => void;
@@ -992,7 +997,7 @@ function Social({
     }
   }
   async function share() {
-    const url = `${window.location.origin}${floorSharePath(data.id, floor.id)}`;
+    const url = floorShareAbsoluteUrl(browserShareOrigin(), data.id, floor.id);
     setMessage("");
     try {
       if (navigator.share) {
@@ -1011,7 +1016,7 @@ function Social({
     }
   }
   function shareOnX() {
-    const url = `${window.location.origin}${floorSharePath(data.id, floor.id)}`;
+    const url = floorShareAbsoluteUrl(browserShareOrigin(), data.id, floor.id);
     window.open(
       xShareUrl(url, floorShareText(data.number, floor.index)),
       "_blank",

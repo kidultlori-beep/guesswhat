@@ -1,4 +1,5 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import sharp from "sharp";
 
 await mkdir("public/icons", { recursive: true });
@@ -35,7 +36,21 @@ const homeCard = await sharp(Buffer.from(home))
   .toColourspace("srgb")
   .jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
   .toBuffer();
+
+const hash = createHash("sha256").update(homeCard).digest("hex").slice(0, 12);
+const hashedName = `ds-home-${hash}.jpg`;
+
+for (const file of await readdir("public/og")) {
+  if (/^ds-home-[0-9a-f]+\.jpg$/i.test(file) && file !== hashedName)
+    await unlink(`public/og/${file}`);
+}
+
 await Promise.all([
-  sharp(homeCard).toFile("public/og/home.jpg"),
-  sharp(homeCard).toFile("public/og/card.jpg"),
+  writeFile(`public/og/${hashedName}`, homeCard),
+  writeFile("public/og/home.jpg", homeCard),
+  writeFile("public/og/card.jpg", homeCard),
+  writeFile(
+    "src/lib/og-home-file.ts",
+    `export const HOME_OG_FILE = ${JSON.stringify(hashedName)};\n`,
+  ),
 ]);
