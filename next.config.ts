@@ -4,6 +4,17 @@ const config: NextConfig = {
   async headers() {
     return [
       {
+        source: "/og/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400",
+          },
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+        ],
+      },
+      {
         source: "/og/ds-home-:hash.jpg",
         headers: [
           {
@@ -16,17 +27,6 @@ const config: NextConfig = {
             key: "Content-Disposition",
             value: 'inline; filename="drawstacks.jpg"',
           },
-        ],
-      },
-      {
-        source: "/og/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=86400",
-          },
-          { key: "Access-Control-Allow-Origin", value: "*" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
         ],
       },
     ];
