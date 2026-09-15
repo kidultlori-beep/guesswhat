@@ -28,7 +28,7 @@ Latest user revision: every floor's artist writes a private comma-separated acce
 1. Browse stacks without creating an account. Before guessing, drawing, liking or commenting, choose a nickname in a small dialog. Return to the interrupted action afterward.
 2. Start a stack: write your own accepted answers, separated by English commas, add a one-sentence public hint, then draw the first floor. Words, phrases, translations and hints in any language are allowed, e.g. `ELON MUSK,马斯克`. There is no word bank or suggestion refresh.
 3. Publish: create both the stack and Floor 1 together. A draft does not appear on the homepage.
-4. Visit a stack: open the latest floor, with access to earlier floors. Each floor is a new prompt with its own private answer list.
+4. Visit a stack: open the latest floor, with access to earlier floors. Each floor is a new prompt with its own private answer list. Selecting a solved earlier floor shows that floor's wrong-guess history, winning guess, accepted answers and public hint.
 5. Incorrect guess: show a coral cross, `Not quite! Try again.`, reduce the remaining attempts by one, and add the guess plus player nickname to the public wrong-guess list.
 6. Correct guess: the first solver wins the next drawing opportunity. Reveal the solved drawing, exact winning guess and full accepted-answer list in a public activity card, notify its artist, and show `Draw the next floor` to the winner.
 7. Relay: the winner must enter new accepted answers before drawing. The previous floor remains a collapsible reference. Publishing adds the new private prompt and returns everyone to the latest floor.
@@ -49,7 +49,7 @@ Proposed first-version defaults, chosen to resolve conflicting older documents:
 - Title: `Every drawing builds a story.` Supporting sentence: `Pick a stack, guess the word, and draw the next floor.`
 - Primary action: `+ Start a stack`.
 - Three-column desktop grid, two columns on tablet, one on phones. A stack is represented by slightly offset drawing sheets, with its latest drawing prominent.
-- Show public stack number, published floor count, founding author, and total likes across its floors. Default ordering is most recently published floor first; use `Load more` after the initial batch.
+- Show public stack number, published floor count, founding author, and total likes across its floors. Default ordering is most recently updated activity first (new drawing, guess, like or comment); use `Load more` after the initial batch.
 - Default titles are `Stack #024`, not the secret word. A free-text title field is omitted from v1 to avoid obvious answer leaks.
 - State-specific action labels: unsolved `Guess this stack`; current floor's winner `Draw next floor`; current artist `View this stack`; completed `View completed stack`.
 - Poll the latest previews and state every five seconds while Home is visible so remote publications appear without refresh.

@@ -29,12 +29,13 @@ Mutations need `X-DrawStacks: 1`; browser Origin must match Host. The session co
 | Method | Route | Result |
 | --- | --- | --- |
 | GET / PUT | `/api/me` | Current identity / choose or update nickname |
-| GET / POST | `/api/stacks` | Twelve public stack summaries (offset pagination) / publish a new stack |
-| GET | `/api/stacks/:id` | Public floors, hint and wrong-guess list plus requester state; answers appear only to the artist/solver or after reveal |
+| GET / POST | `/api/stacks` | Twelve public stack summaries ordered by last activity (offset pagination) / publish a new stack |
+| GET | `/api/stacks/:id` | Public floors with per-floor hints and wrong-guess lists plus requester state; answers and the winning guess appear only to the artist/solver or after that floor is revealed |
 | POST | `/api/stacks/:id/guess` | Correct/duplicate flags plus fresh requester-specific state |
 | POST | `/api/stacks/:id/draw` | Winner publishes relay with `parent`, new `word` answers, public `hint`, `image`, `key` |
 | GET | `/api/floors/:id/image?preview=1` | Immutable PNG thumbnail; omit query for original |
-| GET | `/api/share-card/:floorId` | Public spoiler-free 1200 × 630 social preview PNG |
+| GET | `/api/share-card/:floorId` | Public spoiler-free 1200 × 630 social preview JPEG |
+| GET | `/og/floor/:floorId` | Same JPEG as `/api/share-card/:floorId`, advertised in Open Graph / X tags |
 | PUT | `/api/floors/:id/like` | Set explicit boolean `liked`, safe to retry |
 | GET / POST | `/api/floors/:id/comments` | Read/post authorized plain-text comments |
 | DELETE | `/api/comments/:id` | Owner-only deletion |
@@ -48,7 +49,7 @@ Client errors use `{error: "readable message"}`. Expected statuses: 400 invalid 
 
 `POST /api/stacks` retains the compatible `word` field and accepts user-written English-comma-separated answers, e.g. `ELON MUSK,马斯克`. Every new floor also requires a public `hint` of 1–160 characters. `src/lib/answers.ts` shares answer validation between browser and server: 1–10 distinct entries, 80 characters per entry, 809 input characters total; trim/collapse whitespace, NFC normalization and case-insensitive deduplication while preserving first-entry spelling. Empty entries, full-width comma separators and control characters are rejected with English messages. `/api/words` is removed (404); there are no built-in aliases or suggestions.
 
-Guesses must match one complete normalized entry; do not split a submitted guess into multiple guesses or accept substrings. Each floor owns its answer list and public hint. Server response `word` describes only the latest floor and is null for unsolved viewers other than its artist; revealed floor rows expose their own `answers`. Incorrect guesses return publicly with the guesser's nickname so the group can see what has already been tried. Correct guesses never appear before the solve reveal. The first correct guess atomically locks the right to publish the next floor, reveals the accepted answers, creates a public solve event and alerts the artist. Further guesses against that solved floor are rejected while the winner draws.
+Guesses must match one complete normalized entry; do not split a submitted guess into multiple guesses or accept substrings. Each floor owns its answer list and public hint. Server response `word` describes only the latest floor and is null for unsolved viewers other than its artist; revealed floor rows expose their own `answers`, `winningGuess` and wrong-guess `guesses`. Incorrect guesses return publicly with the guesser's nickname so the group can see what has already been tried, including on earlier solved floors. Correct guesses never appear before the solve reveal. The first correct guess atomically locks the right to publish the next floor, reveals the accepted answers, creates a public solve event and alerts the artist. Further guesses against that solved floor are rejected while the winner draws. Publishing, guessing, liking and commenting bump `stacks.updated` so the home list keeps recently active stacks first.
 
 The startup migration adds per-floor answers, public hints, guesses, attempt meters and notifications, copies each legacy stack answer to its existing floors, and removes the former unique artist/stack restriction. Existing floors receive an empty hint and remain readable; every new publication requires one. Legacy solve/attempt tables remain for compatibility and are migrated without deleting player data. This permits A → B → C → A relays while keeping unique floor order and stale-parent checks.
 
@@ -56,7 +57,7 @@ Drafts retain the compatible `word` field and add `answerInput` plus `hint` for 
 
 ### Social sharing
 
-Selected-floor pages emit Open Graph and X `summary_large_image` metadata. The dynamic editorial card contains only public floor art, stack/floor numbers, artist nickname and neutral invitation copy; its renderer must never query guesses or answers. The home page uses a separate opaque RGB JPEG 1200 × 630 brand card. Metadata declares each card's MIME type, card responses cache publicly for at least 24 hours, and the generated `/robots.txt` explicitly allows Twitterbot. SVG and 32/96 px PNG favicon assets are linked from the root metadata. `src/lib/share.ts` owns canonical floor paths and platform intent encoding. The X action opens `https://x.com/intent/tweet` in a new browsing context, so the player reviews and submits the post on X; no X token is collected.
+Selected-floor pages emit Open Graph and X `summary_large_image` metadata. The dynamic editorial card is an opaque sRGB JPEG containing only public floor art, stack/floor numbers, artist nickname and neutral invitation copy; its renderer must never query guesses or answers. The home page uses a separate opaque RGB JPEG 1200 × 630 brand card at `/og/card.jpg`. Metadata declares each card's MIME type, uses absolute HTTPS image URLs with a version query on the image path (not the page URL), and includes `Content-Length`. Card responses cache publicly for at least 24 hours, and the generated `/robots.txt` explicitly allows Twitterbot. Floor cards are advertised at `/og/floor/:id` (the `/api/share-card/:id` alias remains). SVG and 32/96 px PNG favicon assets are linked from the root metadata. `src/lib/share.ts` owns canonical floor paths, card image paths and platform intent encoding. The X action opens `https://x.com/intent/tweet` in a new browsing context, so the player reviews and submits the post on X; no X token is collected.
 
 Use `DRAWSTACKS_PUBLIC_URL` in hosted/proxied environments. Without it, metadata derives the request origin. Social crawlers cannot reach localhost or private LAN origins. Future platform buttons should be adapters around the same canonical URL and metadata, with the native Web Share API remaining the device-level fallback. OAuth posting APIs are a separate, explicit-consent feature and must not reuse the anonymous game cookie as social authorization.
 

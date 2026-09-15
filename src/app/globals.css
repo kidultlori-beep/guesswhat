@@ -693,6 +693,14 @@ input[type="color"]::-webkit-color-swatch {
   border-radius: 8px;
   text-align: center;
 }
+.solved-floor-meta {
+  margin: 8px 0 12px;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.guess-panel > .text-button {
+  margin: 14px 0 4px;
+}
 .guess-history {
   border-top: 1px solid var(--border);
   margin-top: 25px;

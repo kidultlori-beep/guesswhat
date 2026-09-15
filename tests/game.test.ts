@@ -3,8 +3,16 @@ import assert from "node:assert/strict";
 import { Game, GameError } from "../src/lib/game";
 import { PNG } from "pngjs";
 import { parseAnswers, matchesAnswer } from "../src/lib/answers";
-import { floorSharePath, floorShareText, xShareUrl } from "../src/lib/share";
+import {
+  floorOgImagePath,
+  floorSharePath,
+  floorShareText,
+  homeOgImagePath,
+  xShareUrl,
+} from "../src/lib/share";
 import { floodFill } from "../src/lib/paint";
+import { renderShareCard } from "../src/lib/share-card";
+import sharp from "sharp";
 import { mkdtempSync, existsSync, unlinkSync, rmdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -101,6 +109,25 @@ test("share links preserve the selected floor and build an encoded X intent", ()
   assert.equal(intent.pathname, "/intent/tweet");
   assert.equal(intent.searchParams.get("text"), text);
   assert.equal(intent.searchParams.get("url"), `https://draw.example${path}`);
+  assert.equal(homeOgImagePath(), "/og/card.jpg?v=20260915");
+  assert.equal(
+    floorOgImagePath("floor ? 2"),
+    "/og/floor/floor%20%3F%202?v=20260915",
+  );
+});
+test("share cards render as opaque JPEG without answers", async () => {
+  const card = await renderShareCard({
+    image: Buffer.from(picture.split(",")[1], "base64"),
+    stackNumber: 12,
+    floorIndex: 3,
+    author: "Alice",
+  });
+  const meta = await sharp(card).metadata();
+  assert.equal(meta.format, "jpeg");
+  assert.equal(meta.width, 1200);
+  assert.equal(meta.height, 630);
+  assert.equal(meta.channels, 3);
+  assert.equal(meta.space, "srgb");
 });
 test("a correct answer reveals that floor, creates a public event and notifies its artist", (t) => {
   const { game, a, b, c } = setup(t);
@@ -198,6 +225,11 @@ test("answers stay private while wrong guesses and hints are public", (t) => {
   assert(publicData.includes("It has two wheels."));
   assert(!publicData.includes(a.token!));
   assert.deepEqual(game.detail(s.id).guesses[0], {
+    text: "scooter",
+    correct: false,
+    author: "Bob",
+  });
+  assert.deepEqual(game.detail(s.id).floors[0].guesses[0], {
     text: "scooter",
     correct: false,
     author: "Bob",
@@ -340,6 +372,76 @@ test("relay requires solving latest floor, new answers, and supports alternating
   );
   assert.equal(game.detail(s.id).floors.length, 4);
   assert.equal(game.rankings("stacks").rows[0].score, 4);
+});
+test("solved floors keep wrong guesses, accepted answers and hints", (t) => {
+  const { game, b, c, s } = setup(t);
+  game.guess(b.user.id, s.id, "scooter");
+  game.guess(c.user.id, s.id, "bike");
+  game.publish(
+    c.user.id,
+    {
+      word: "cat,kitty",
+      hint: "It purrs.",
+      image: picture,
+      key: "history-relay-1",
+      parent: s.floor,
+    },
+    s.id,
+  );
+  const publicDetail = game.detail(s.id, b.user.id);
+  const past = publicDetail.floors[0];
+  const latest = publicDetail.floors[1];
+  assert.equal(past.hint, "It has two wheels.");
+  assert.equal(past.answers, "bicycle,bike");
+  assert.equal(past.winningGuess, "bike");
+  assert.equal(past.winner, "Charlie");
+  assert.deepEqual(past.guesses[0], {
+    text: "scooter",
+    correct: false,
+    author: "Bob",
+  });
+  assert.equal(latest.answers, null);
+  assert.equal(latest.winningGuess, null);
+  assert.equal(latest.hint, "It purrs.");
+  assert.equal(publicDetail.word, null);
+  assert.equal(publicDetail.guesses.length, 0);
+  const hidden = JSON.stringify({
+    latest,
+    list: game.list(),
+    rank: game.rankings("stacks"),
+  });
+  assert(!hidden.includes("cat"));
+  assert(!hidden.includes("kitty"));
+});
+test("home lists stacks by latest activity, not only new drawings", (t) => {
+  const { game, a, b, s, advance } = setup(t);
+  advance(1000);
+  const newer = game.publish(a.user.id, {
+    word: "cat",
+    hint: "It purrs.",
+    image: picture,
+    key: "activity-newer-1",
+  });
+  assert.equal(game.list()[0].id, newer.id);
+  advance(1000);
+  game.like(b.user.id, s.floor, true);
+  assert.equal(game.list()[0].id, s.id);
+  advance(1000);
+  game.guess(b.user.id, newer.id, "dog");
+  assert.equal(game.list()[0].id, newer.id);
+  advance(1000);
+  game.guess(b.user.id, newer.id, "cat");
+  advance(1000);
+  const third = game.publish(a.user.id, {
+    word: "moon",
+    hint: "It shines at night.",
+    image: picture,
+    key: "activity-third-1",
+  });
+  assert.equal(game.list()[0].id, third.id);
+  advance(1000);
+  game.comment(b.user.id, newer.floor, "Nice!");
+  assert.equal(game.list()[0].id, newer.id);
 });
 test("blank, malformed, wrong-size images rejected and no orphan stacks created", (t) => {
   const { game, a } = setup(t);
