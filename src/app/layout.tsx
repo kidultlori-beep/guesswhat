@@ -5,14 +5,15 @@ import "@fontsource/nunito/600.css";
 import "@fontsource/nunito/700.css";
 import "./globals.css";
 import {
+  HOME_SHARE_DESCRIPTION,
+  HOME_SHARE_TITLE,
   absoluteAssetUrl,
   homeOgImagePath,
   ogImageDescriptor,
 } from "@/lib/share";
 
-const title = "DrawStacks — Draw. Guess. Build together.";
-const description =
-  "New answers and a new drawing on every floor. A collaborative drawing and guessing game.";
+const title = HOME_SHARE_TITLE;
+const description = HOME_SHARE_DESCRIPTION;
 const metadataOrigin =
   process.env.DRAWSTACKS_PUBLIC_URL || "http://localhost:3000";
 const homeCard = absoluteAssetUrl(homeOgImagePath(), metadataOrigin);
@@ -22,12 +23,10 @@ export const metadata: Metadata = {
   title,
   description,
   metadataBase: new URL(metadataOrigin),
-  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     title,
     description,
-    url: "/",
     siteName: "DrawStacks",
     images: [homeImage],
   },

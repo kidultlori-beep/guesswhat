@@ -1,8 +1,10 @@
 import GameApp from "@/components/GameApp";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { getGame } from "@/lib/server";
+import { publicOrigin } from "@/lib/public-origin";
 import {
+  HOME_SHARE_DESCRIPTION,
+  HOME_SHARE_TITLE,
   absoluteAssetUrl,
   floorOgImagePath,
   floorShareAbsoluteUrl,
@@ -22,21 +24,6 @@ type ShareFloor = {
   author: string;
   stackId: string;
 };
-
-async function publicOrigin() {
-  const configured = process.env.DRAWSTACKS_PUBLIC_URL;
-  if (configured) {
-    try {
-      const url = new URL(configured);
-      if (url.protocol === "http:" || url.protocol === "https:")
-        return url.origin;
-    } catch {}
-  }
-  const h = await headers();
-  const host = h.get("x-forwarded-host") || h.get("host") || "localhost:3000";
-  const protocol = h.get("x-forwarded-proto") || "http";
-  return `${protocol}://${host}`;
-}
 
 async function shareFloor(
   path: string[],
@@ -65,7 +52,35 @@ export async function generateMetadata({
   const origin = await publicOrigin();
   const query = await searchParams;
   const floor = await shareFloor(path, query);
-  if (!floor) return {};
+  if (!floor) {
+    if (path.length > 0) return {};
+    const pageUrl = origin;
+    const cardUrl = absoluteAssetUrl(homeOgImagePath(), origin);
+    const image = ogImageDescriptor(cardUrl, HOME_SHARE_TITLE);
+    return {
+      title: HOME_SHARE_TITLE,
+      description: HOME_SHARE_DESCRIPTION,
+      alternates: { canonical: pageUrl },
+      openGraph: {
+        type: "website",
+        title: HOME_SHARE_TITLE,
+        description: HOME_SHARE_DESCRIPTION,
+        url: pageUrl,
+        siteName: "DrawStacks",
+        images: [image],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: HOME_SHARE_TITLE,
+        description: HOME_SHARE_DESCRIPTION,
+        images: [image],
+      },
+      other: {
+        "og:image:secure_url": cardUrl,
+        "twitter:image:src": cardUrl,
+      },
+    };
+  }
 
   const title = `Can you guess Floor ${floor.floor}? — DrawStacks`;
   const description = `A drawing by ${floor.author} in Stack #${String(floor.number).padStart(3, "0")}. Solve it to draw the next floor.`;

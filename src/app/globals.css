@@ -441,6 +441,13 @@ input[type="color"]::-webkit-color-swatch {
   padding: 12px 28px;
   font-size: 30px;
 }
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+}
 .stack-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

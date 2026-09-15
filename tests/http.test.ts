@@ -75,6 +75,7 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   assert.ok(homeHtml.includes(homeOgImagePath()));
   assert.doesNotMatch(homeHtml, /og\/card\.jpg\?v=/);
   assert.match(homeHtml, /image\/jpeg/);
+  assert.doesNotMatch(homeHtml, /rel="canonical" href="[^"]*\/play"/);
   const hashedCard = homeOgImagePath();
   for (const asset of [
     ["/icon.svg", "image/svg+xml"],
@@ -104,6 +105,23 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   assert.equal(homeCardMetadata.height, 630);
   assert.equal(homeCardMetadata.space, "srgb");
   assert.equal(homeCardMetadata.channels, 3);
+  const playHtml = await (await fetch(`${root}/play`)).text();
+  assert.match(playHtml, /summary_large_image/);
+  assert.match(playHtml, /og:image:secure_url/);
+  assert.match(playHtml, /rel="image_src"/);
+  assert.ok(playHtml.includes(homeOgImagePath()));
+  const playCanonicals = [
+    ...playHtml.matchAll(/rel="canonical" href="([^"]+)"/g),
+  ].map((match) => match[1]);
+  assert.ok(playCanonicals.length >= 1);
+  for (const href of playCanonicals) assert.match(href, /\/play\/?$/);
+  const playOgUrls = [
+    ...playHtml.matchAll(/property="og:url" content="([^"]+)"/g),
+  ].map((match) => match[1]);
+  assert.ok(playOgUrls.length >= 1);
+  for (const href of playOgUrls) assert.match(href, /\/play\/?$/);
+  assert.doesNotMatch(playHtml, /og\/card\.jpg\?v=/);
+  assert.match(playHtml, /image\/jpeg/);
   const robots = await fetch(`${root}/robots.txt`);
   assert.equal(robots.status, 200);
   assert.match(robots.headers.get("content-type") || "", /^text\/plain/);
@@ -200,6 +218,15 @@ test("real HTTP publication, permissions, private guesses, social actions, relay
   assert.match(sharedHtml, /og:image:secure_url/);
   assert.match(sharedHtml, /rel="image_src"/);
   assert.match(sharedHtml, /image\/jpeg/);
+  assert.match(
+    sharedHtml,
+    /rel="canonical" href="[^"]*\/stacks\/[^"]+\?floor=/,
+  );
+  assert.match(
+    sharedHtml,
+    /property="og:url" content="[^"]*\/stacks\/[^"]+\?floor=/,
+  );
+  assert.doesNotMatch(sharedHtml, /rel="canonical" href="[^"]*\/play"/);
   assert.equal(
     (await call(`floors/${s.floor}/comments`, "GET", undefined, b.cookie))
       .status,

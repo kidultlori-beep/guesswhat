@@ -38,6 +38,8 @@ import {
   browserShareOrigin,
   floorShareAbsoluteUrl,
   floorShareText,
+  homeShareAbsoluteUrl,
+  homeShareText,
   xShareUrl,
 } from "@/lib/share";
 import DrawingEditor from "./DrawingEditor";
@@ -138,7 +140,10 @@ export default function GameApp() {
         </Link>
         <span className="tagline">Draw. Guess. Build together.</span>
         <nav aria-label="Main navigation">
-          <Link className={path === "/" ? "active" : ""} href="/">
+          <Link
+            className={path === "/" || path === "/play" ? "active" : ""}
+            href="/"
+          >
             Stacks
           </Link>
           <Link
@@ -223,7 +228,8 @@ export default function GameApp() {
               </>
             )}
           </div>
-        ) : parts.length === 0 ? (
+        ) : parts.length === 0 ||
+          (parts[0] === "play" && parts.length === 1) ? (
           <Home
             user={user}
             requireUser={requireUser}
@@ -409,14 +415,34 @@ function Home({
     }, 5000);
     return () => clearInterval(timer);
   }, [load]);
+  function shareOnX() {
+    const url = homeShareAbsoluteUrl(browserShareOrigin());
+    window.open(
+      xShareUrl(url, homeShareText()),
+      "_blank",
+      "noopener,noreferrer",
+    );
+  }
   return (
     <>
       <section className="hero">
         <h1>Every drawing builds a story.</h1>
         <p>Pick a stack, guess the answer, and draw the next floor.</p>
-        <button className="primary hero-cta" onClick={() => requireUser(onNew)}>
-          <Plus size={29} /> Start a stack
-        </button>
+        <div className="hero-actions">
+          <button
+            className="primary hero-cta"
+            onClick={() => requireUser(onNew)}
+          >
+            <Plus size={29} /> Start a stack
+          </button>
+          <button
+            type="button"
+            onClick={shareOnX}
+            aria-label="Share DrawStacks on X"
+          >
+            <XLogo weight="bold" /> Share on X
+          </button>
+        </div>
       </section>
       {error && (
         <div role="alert" className="notice error">
